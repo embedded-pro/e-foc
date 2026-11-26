@@ -29,8 +29,8 @@ date: 2026-11-26
 ## Responsibilities
 
 The decimating inverter sits between a platform's power stage and everything that samples the phase
-currents: the FOC cascades, the calibration procedures and the dead-time compensation. It is the one
-place that turns the platform's per-period samples into the rate a consumer asks for.
+currents. These are the FOC cascades, the calibration procedures and the dead-time compensation. It
+is the one place that turns the platform's per-period samples into the rate a consumer asks for.
 
 **Is responsible for:**
 
@@ -54,9 +54,9 @@ Before this component, each platform interpreted the requested rate itself, and 
 | Hardware platform B        | Nothing; every sample was delivered              |
 | Emulator and MIL simulator | Kept the PWM rate and delivered every Nth sample |
 
-On platform A, alignment switched the bridge at 1 kHz and the inductance and pole-pair steps at 10 kHz, so
-they characterised a different inverter from the one the current loop runs. The platforms are now split
-from the consumers by two interfaces:
+On platform A, alignment switched the bridge at 1 kHz and the inductance and pole-pair steps at 10 kHz.
+They therefore characterised a different inverter from the one the current loop runs. The platforms are
+now split from the consumers by two interfaces:
 
 - **Power stage** (platform side). It invokes its callback with the phase currents once every PWM
   period and has no notion of a requested rate. Every platform implements it, and so does the
@@ -66,7 +66,7 @@ from the consumers by two interfaces:
 
 ### Part B — Choosing a rate
 
-A request names a rate and a callback. The ratio N is the PWM frequency divided by the rate; a rate
+A request names a rate and a callback. The ratio N is the PWM frequency divided by the rate. A rate
 that does not divide the PWM frequency is a programming error and stops the firmware.
 
 - **N = 1 (the control loop, the offsets measurement, the resistance step).** The component installs
@@ -82,8 +82,8 @@ called.
 ### Part C — Changing the callback while the interrupt runs
 
 A request is made from the main context while the power stage's interrupt may be running. Both the
-power stage's callback and the consumer callback the counter hands samples to are swapped as a whole:
-the interrupt runs either the previous callback or the new one, never a mix. The ratio and the count
+power stage's callback and the consumer callback the counter hands samples to are swapped as a whole.
+The interrupt runs either the previous callback or the new one, never a mix. The ratio and the count
 are single words, so a request that lands between two samples changes the delivery from the next
 sample on.
 
@@ -166,23 +166,28 @@ graph LR
 
 ## Constraints & Limitations
 
-| Constraint                   | Value / Description                                                          |
-|------------------------------|------------------------------------------------------------------------------|
-| Allowed rates                | Divisors of the PWM frequency: 20 kHz, 10 kHz, 5 kHz, 4 kHz, 2 kHz, 1 kHz, … |
-| Consumers                    | One at a time; the latest request wins                                       |
-| Cost at the PWM rate         | None in the interrupt; the consumer is the power stage's callback            |
-| Cost below the PWM rate      | One count and compare per PWM period, outside the control loop               |
-| First sample after a request | The Nth power-stage sample after it                                          |
-| PWM frequency                | Unchanged; the power stage switches at its configured frequency for any rate |
+| Constraint                   | Value / Description                                                            |
+|------------------------------|--------------------------------------------------------------------------------|
+| Allowed rates                | Divisors of the PWM frequency: 20 kHz, 10 kHz, 5 kHz, 4 kHz, 2 kHz, 1 kHz, …   |
+| Consumers                    | One at a time; the latest request wins                                         |
+| Cost at the PWM rate         | None in the interrupt; the consumer is the power stage's callback              |
+| Cost below the PWM rate      | One count and compare per PWM period, outside the control loop                 |
+| First sample after a request | The Nth power-stage sample after it                                            |
+| PWM frequency                | Unchanged; the power stage switches at its configured frequency for any rate   |
 | Per-sample platform work     | The over-current check and cycle metrics run in the platform's interrupt first |
-| No filtering                 | Samples that are not delivered are dropped, not averaged                     |
+| No filtering                 | Samples that are not delivered are dropped, not averaged                       |
 
 ---
 
 ## Verification
 
-Unit tests drive a power-stage mock and check that every sample is delivered at the PWM frequency,
-that every Nth is delivered below it, that a new request restarts the count, that a return to the PWM
-frequency delivers every sample again, and that the PWM output, start, stop, frequency and current
-limit pass through. The model-in-the-loop and software-in-the-loop suites run alignment and electrical
+Unit tests drive a power-stage mock and check that:
+
+- every sample is delivered at the PWM frequency
+- every Nth is delivered below it
+- a new request restarts the count
+- a return to the PWM frequency delivers every sample again
+- the PWM output, start, stop, frequency and current limit pass through.
+
+The model-in-the-loop and software-in-the-loop suites run alignment and electrical
 identification through it at 1 kHz and 10 kHz.

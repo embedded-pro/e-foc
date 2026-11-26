@@ -88,11 +88,11 @@ Vα = Vd·cos(θe) − Vq·sin(θe)
 Vβ = Vd·sin(θe) + Vq·cos(θe)
 ```
 
-The inverse Park transform is applied after the PID controllers produce voltage demands Vd and Vq, converting them back to the stationary frame for SVM processing.
+The inverse Park transform is applied after the PID controllers produce voltage demands Vd and Vq. It converts them back to the stationary frame for SVM processing.
 
 **Delay compensation (angle advance):**
 
-The duty computed from a sample takes effect n periods after the next counter zero and is held for a period, so the rotor turns through (n + ½)·ωe·Ts before the average of the applied vector. The advance rotates the already evaluated (cos θe, sin θe) pair through δ = (n + ½)·ωe·Ts, with cos δ ≈ 1 − δ²/2 and sin δ ≈ δ − δ³/6, instead of looking the trigonometry up a second time: nine multiplications and a few additions, against a wrap, two table reads and two interpolations. The product (n + ½)·Ts is computed when the controller is configured. δ is limited to ±0.35 rad: the largest error inside that band is 6.3·10⁻⁴ on the cosine (δ⁴/24) and 4.4·10⁻⁵ on the sine (δ⁵/120), a 3·10⁻⁴ error in the length of the voltage vector, and the angle error is below 10⁻⁴ rad. The band covers the Teknic at 6000 rpm (δ = 0.19 rad with n = 1) and any 4-pole-pair motor up to the 1000 rad/s speed setpoint limit with n = 1 (0.30 rad); beyond it the compensation saturates instead of leaving the approximation. At zero speed the pair is returned unchanged.
+The duty computed from a sample takes effect n periods after the next counter zero and is held for a period. The rotor therefore turns through (n + ½)·ωe·Ts before the average of the applied vector. The advance rotates the already evaluated (cos θe, sin θe) pair through δ = (n + ½)·ωe·Ts. It uses cos δ ≈ 1 − δ²/2 and sin δ ≈ δ − δ³/6 instead of looking the trigonometry up a second time. This costs nine multiplications and a few additions, against a wrap, two table reads and two interpolations. The product (n + ½)·Ts is computed when the controller is configured. The angle δ is limited to ±0.35 rad. Inside that band, the largest error is 6.3·10⁻⁴ on the cosine (δ⁴/24) and 4.4·10⁻⁵ on the sine (δ⁵/120). This gives a 3·10⁻⁴ error in the length of the voltage vector, and the angle error is below 10⁻⁴ rad. The band covers the Teknic at 6000 rpm (δ = 0.19 rad with n = 1). It also covers any 4-pole-pair motor up to the 1000 rad/s speed setpoint limit with n = 1 (0.30 rad). Beyond it, the compensation saturates instead of leaving the approximation. At zero speed the pair is returned unchanged.
 
 **Electrical angle:**
 
@@ -110,16 +110,16 @@ The caller is responsible for supplying the correct θe.
 
 ### Composite Clarke–Park — Chained Transform with Single Trigonometric Evaluation
 
-The Clarke–Park composite combines the forward Clarke and forward Park transforms (or their inverses) into a single operation. The motivation is efficiency: cos(θe) and sin(θe) are computed exactly once and reused for both the Park rotation in the forward direction and the inverse Park rotation.
+The Clarke–Park composite combines the forward Clarke and forward Park transforms (or their inverses) into a single operation. The motivation is efficiency. The composite computes cos(θe) and sin(θe) exactly once and reuses them for both the Park rotation in the forward direction and the inverse Park rotation.
 
 The forward composite takes (Ia, Ib, θe) and produces (Id, Iq) directly.  
-The inverse composite takes (Vd, Vq, θe), performs inverse Park to (Vα, Vβ), then inverse Clarke to (Va, Vb, Vc), producing all three phase voltages in one call.
+The inverse composite takes (Vd, Vq, θe), performs inverse Park to (Vα, Vβ), then inverse Clarke to (Va, Vb, Vc). It produces all three phase voltages in one call.
 
 This is the form used by all inner-control-loop implementations in this project.
 
 ### Space Vector Modulation — αβ Voltage Vector to PWM Duty Cycles
 
-Space Vector Modulation (SVM) maps a two-component voltage reference vector in the αβ plane to three symmetrical PWM duty cycles. The implementation is *sector-free*: it reaches the same duty cycles as classical sector-and-dwell-time SVM by injecting a common-mode offset, which is algebraically equivalent and has no branch on sector index.
+Space Vector Modulation (SVM) maps a two-component voltage reference vector in the αβ plane to three symmetrical PWM duty cycles. The implementation is *sector-free*. It reaches the same duty cycles as classical sector-and-dwell-time SVM by injecting a common-mode offset. This is algebraically equivalent and has no branch on sector index.
 
 **Inverse Clarke:**
 
@@ -130,15 +130,16 @@ The reference is first expanded to three phase voltages, `vA = Vα`, `vB = -Vα/
 The offset `vCommon = -(max(vA,vB,vC) + min(vA,vB,vC)) / 2` is added to all three phases. Because it is
 identical on every phase it cancels in every line-to-line voltage, so it changes no motor current while
 centring the waveform. This is what recovers the linear range that classical SVM obtains from symmetric
-null-vector splitting: a factor 2/√3 ≈ 1.155 more than sinusoidal PWM reaches on the same bus. In the
-per-unit convention used here — inputs relative to `V_dc/√3` — that extended range *is* the unit circle,
-which is why the modulation limiter clamps on |V| ≤ 1 rather than on 2/√3.
+null-vector splitting. That range is a factor 2/√3 ≈ 1.155 more than sinusoidal PWM reaches on the same
+bus. In the per-unit convention used here, inputs are relative to `V_dc/√3`. In this convention that
+extended range *is* the unit circle. This is why the modulation limiter clamps on |V| ≤ 1 rather than on
+2/√3.
 
 **Duty cycle output:**
 
-Each offset phase voltage is scaled by 1/√3, biased by 0.5 to centre it in the PWM period, clamped once and
-rounded to the nearest duty-cycle step: `d = clamp(v/√3 + 0.5, 0, 1)`. A reference of unit magnitude therefore
-spans exactly [0, 1]. A non-finite phase lands on zero duty.
+Each offset phase voltage is scaled by 1/√3 and biased by 0.5 to centre it in the PWM period. It is then
+clamped once and rounded to the nearest duty-cycle step: `d = clamp(v/√3 + 0.5, 0, 1)`. A reference of unit
+magnitude therefore spans exactly [0, 1]. A non-finite phase lands on zero duty.
 
 **Constraints:**
 - Input Vα, Vβ are per-unit relative to `V_dc/√3` (dimensionless, inside the unit circle for linear operation).
@@ -164,27 +165,27 @@ Library sine and cosine functions introduce variable latency and are unsuitable 
 - Total ROM footprint: 512 × 4 bytes = 2 048 bytes (2 KB)
 - Covers exactly one full period
 
-**Range handling**: the angle is *not* normalised to [0, 2π) before indexing. It is scaled by
-512/2π, truncated toward negative infinity, and the resulting index is masked with the table size minus one, so
-the wrap is a bitwise AND on the index rather than a modulo on the angle. This is why there is no
-floating-point modulo in the hot path. The consequence to know is the domain limit it leaves: the intermediate is
+**Range handling**: the angle is *not* normalised to [0, 2π) before indexing. It is scaled by 512/2π and
+truncated toward negative infinity. The resulting index is masked with the table size minus one. The wrap is
+therefore a bitwise AND on the index rather than a modulo on the angle. This is why there is no
+floating-point modulo in the hot path. The consequence to know is the domain limit it leaves. The intermediate is
 a 32-bit signed integer, so the result is meaningless for angles beyond roughly 2.6 × 10⁷ radians. Electrical
 angle reaches the transforms already wrapped, so this bound is not approached in the control loop.
 
 **Cosine** reuses the sine table — there is no separate cosine table — but it is *not* an index
-offset. It adds π/2 to the angle and performs the whole lookup again, so a cosine costs a full sine
-plus one addition, and evaluating both for the same angle does the range reduction twice.
+offset. It adds π/2 to the angle and performs the whole lookup again. A cosine therefore costs a
+full sine plus one addition. Evaluating both for the same angle does the range reduction twice.
 
-**Interpolation:** Linear interpolation between adjacent LUT entries provides accuracy sufficient for FOC applications; the quantisation error is below the noise floor of 12-bit ADC current sensing.
+**Interpolation:** Linear interpolation between adjacent LUT entries provides accuracy sufficient for FOC applications. The quantisation error is below the noise floor of 12-bit ADC current sensing.
 
-**Accurate sine and cosine:** some configuration-time computations need more than the interpolated
-table's ≈1.9 × 10⁻⁵ — the Goertzel bin phasor of the inductance estimator turns an error ε in cos ω into
-a phase error of about Nε / (2 sin ω) over its N-sample block, which biases the identified inductance.
-These take the table entry just below the angle and rotate it by the remaining offset δ < 2π/512 with
-the series sin δ ≈ δ − δ³/6 and cos δ ≈ 1 − δ²/2 + δ⁴/24, whose truncation error is below 10⁻¹¹.
-The result is as accurate as the table entries themselves (within 1.3 × 10⁻⁶), uses the same ROM, and keeps
-the library's single-precision sine and cosine and their argument reduction — about 4 KB of flash on the target — out of the
-firmware. It costs a handful of multiplies more than the interpolated sine, so the control loop keeps the interpolated
+**Accurate sine and cosine:** some configuration-time computations need more than the interpolated table's ≈1.9 × 10⁻⁵. The
+Goertzel bin phasor of the inductance estimator is one example. It turns an error ε in cos ω into a phase error of about Nε
+/ (2 sin ω) over its N-sample block. This phase error biases the identified inductance. These computations take the table
+entry just below the angle and rotate it by the remaining offset δ < 2π/512. The rotation uses the series sin δ ≈ δ − δ³/6
+and cos δ ≈ 1 − δ²/2 + δ⁴/24. The truncation error of this series is below 10⁻¹¹. The result is as accurate as the table
+entries themselves (within 1.3 × 10⁻⁶) and uses the same ROM. It also keeps the library's single-precision sine and cosine
+and their argument reduction out of the firmware. These take about 4 KB of flash on the target. It costs a handful of
+multiplies more than the interpolated sine, so the control loop keeps the interpolated
 form.
 
 ---
@@ -193,36 +194,36 @@ form.
 
 ### Provided
 
-| Interface                        | Purpose                                           | Contract                                                                                                                                       |
-|----------------------------------|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
-| Clarke — Forward                 | Converts (Ia, Ib, Ic) to (Iα, Iβ)                 | All three phase currents are measured; no phase is reconstructed. The amplitude-invariant form remains valid for unbalanced phases.            |
-| Clarke — Inverse                 | Converts (Vα, Vβ) to (Va, Vb, Vc)                 | Produces all three phase voltages. The sum of outputs is zero.                                                                                 |
-| Park — Forward                   | Converts (Iα, Iβ, θe) to (Id, Iq)                 | Caller supplies pre-computed or LUT-evaluated cos(θe) and sin(θe). Stateless.                                                                  |
-| Park — Inverse                   | Converts (Vd, Vq, θe) to (Vα, Vβ)                 | Uses the same θe as the forward Park in the same control cycle.                                                                                |
-| Clarke–Park — Forward            | Converts (Ia, Ib, θe) to (Id, Iq) in one call     | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                                            |
-| Clarke–Park — Inverse            | Converts (Vd, Vq, θe) to (Va, Vb, Vc) in one call | Chains inverse Park → inverse Clarke; computes cos/sin once. Output is three phase voltages, not (Vα, Vβ).                                     |
-| Space vector modulation          | Converts (Vα, Vβ) to three duty cycles            | Inputs must be per-unit relative to `V_dc/√3`. Outputs are always in [0.0, 1.0]. Common-mode injection is internal; there is no sector branch. |
+| Interface               | Purpose                                           | Contract                                                                                                                                       |
+|-------------------------|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| Clarke — Forward        | Converts (Ia, Ib, Ic) to (Iα, Iβ)                 | All three phase currents are measured; no phase is reconstructed. The amplitude-invariant form remains valid for unbalanced phases.            |
+| Clarke — Inverse        | Converts (Vα, Vβ) to (Va, Vb, Vc)                 | Produces all three phase voltages. The sum of outputs is zero.                                                                                 |
+| Park — Forward          | Converts (Iα, Iβ, θe) to (Id, Iq)                 | Caller supplies pre-computed or LUT-evaluated cos(θe) and sin(θe). Stateless.                                                                  |
+| Park — Inverse          | Converts (Vd, Vq, θe) to (Vα, Vβ)                 | Uses the same θe as the forward Park in the same control cycle.                                                                                |
+| Clarke–Park — Forward   | Converts (Ia, Ib, θe) to (Id, Iq) in one call     | Computes cos/sin once; result is identical to chaining Clarke then Park separately.                                                            |
+| Clarke–Park — Inverse   | Converts (Vd, Vq, θe) to (Va, Vb, Vc) in one call | Chains inverse Park → inverse Clarke; computes cos/sin once. Output is three phase voltages, not (Vα, Vβ).                                     |
+| Space vector modulation | Converts (Vα, Vβ) to three duty cycles            | Inputs must be per-unit relative to `V_dc/√3`. Outputs are always in [0.0, 1.0]. Common-mode injection is internal; there is no sector branch. |
 
 ### Required
 
-| Interface                                      | Purpose                                     | Contract                                                                                  |
-|------------------------------------------------|---------------------------------------------|-------------------------------------------------------------------------------------------|
-| Fast sine and cosine (numerical toolbox)       | sin(θe) and cos(θe) for the Park transforms | 512-entry ROM table with linear interpolation; any angle, no wrap needed; within 2 × 10⁻⁵ |
-| Accurate sine and cosine (numerical toolbox)   | sin(θ) and cos(θ) for configuration time    | Same table plus a short series; within 1.3 × 10⁻⁶. Not for the control loop               |
+| Interface                                    | Purpose                                     | Contract                                                                                  |
+|----------------------------------------------|---------------------------------------------|-------------------------------------------------------------------------------------------|
+| Fast sine and cosine (numerical toolbox)     | sin(θe) and cos(θe) for the Park transforms | 512-entry ROM table with linear interpolation; any angle, no wrap needed; within 2 × 10⁻⁵ |
+| Accurate sine and cosine (numerical toolbox) | sin(θ) and cos(θ) for configuration time    | Same table plus a short series; within 1.3 × 10⁻⁶. Not for the control loop               |
 
 ---
 
 ## Data Model
 
-| Entity              | Field      | Type / Unit           | Range           | Notes                                           |
-|---------------------|------------|-----------------------|-----------------|-------------------------------------------------|
-| Three-phase current | Ia, Ib     | Ampere (float)        | ± rated current | Ic derived; not stored                          |
-| Stationary frame    | Iα, Iβ     | Ampere (float)        | ± rated current | Output of Clarke forward                        |
-| Synchronous frame   | Id, Iq     | Ampere (float)        | ± rated current | Output of Park forward                          |
-| Voltage demand      | Vd, Vq     | Dimensionless (float) | [−1, +1]        | Normalised to DC bus                            |
-| Stationary voltage  | Vα, Vβ     | Dimensionless (float) | [−1, +1]        | Output of inverse Park / input to SVM           |
-| Phase duty cycles   | Da, Db, Dc | Fraction (float)      | [0.0, 1.0]      | Clamped; 0 = always low, 1 = always high        |
-| Electrical angle    | θe         | Radians (float)       | [0, 2π)         | θm × pole pairs; normalised before LUT indexing |
+| Entity              | Field      | Type / Unit           | Range           | Notes                                            |
+|---------------------|------------|-----------------------|-----------------|--------------------------------------------------|
+| Three-phase current | Ia, Ib     | Ampere (float)        | ± rated current | Ic derived; not stored                           |
+| Stationary frame    | Iα, Iβ     | Ampere (float)        | ± rated current | Output of Clarke forward                         |
+| Synchronous frame   | Id, Iq     | Ampere (float)        | ± rated current | Output of Park forward                           |
+| Voltage demand      | Vd, Vq     | Dimensionless (float) | [−1, +1]        | Normalised to DC bus                             |
+| Stationary voltage  | Vα, Vβ     | Dimensionless (float) | [−1, +1]        | Output of inverse Park / input to SVM            |
+| Phase duty cycles   | Da, Db, Dc | Fraction (float)      | [0.0, 1.0]      | Clamped; 0 = always low, 1 = always high         |
+| Electrical angle    | θe         | Radians (float)       | [0, 2π)         | θm × pole pairs; normalised before LUT indexing  |
 | LUT                 | Sine table | 512 floats            | [−1.0, +1.0]    | Built at compile time; 2 KB ROM; 16-byte aligned |
 
 ---

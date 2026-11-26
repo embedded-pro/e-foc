@@ -27,20 +27,20 @@ date: 2026-11-26
 ## Overview
 
 A virtual motor is a motor controller that exists only on the development machine. It runs the
-**shipping application** — the state machine, the control cascades, the calibration services, the
-non-volatile memory stack and the CAN server, composed exactly as the board composes them — compiled
-for the host, on a virtual board whose power stage, encoder, supply and protection are the simulation
-plant that the software-in-the-loop suite and the model-in-the-loop tests already use.
+**shipping application**, compiled for the host. The shipping application is the state machine, the control
+cascades, the calibration services, the non-volatile memory stack and the CAN server. These are composed
+exactly as the board composes them. It runs on a virtual board. The power stage, encoder, supply and protection
+of that board are the simulation plant that the software-in-the-loop suite and the model-in-the-loop tests already use.
 
-It speaks CAN on a **virtual CAN bus**, so the CAN Commander connects to it as it connects to a real
+It speaks CAN on a **virtual CAN bus**. Thus the CAN Commander connects to it as it connects to a real
 board: through an interface name, without knowing that the motor is simulated. Beside the bus, each
-virtual motor opens a **plant port** through which the Virtual Motor app ([tool-virtual-motor.md](tool-virtual-motor.md))
-watches what a bench instrument would watch — phase currents, leg voltages, the true and the reported
-rotor angle, the supply and the winding temperature — and injects load and disturbance torque and
-sensor noise while the motor runs. The motor itself — its parameters, its non-idealities and any wiring
+virtual motor opens a **plant port**. Through it, the Virtual Motor app ([tool-virtual-motor.md](tool-virtual-motor.md))
+watches what a bench instrument would watch. These are the phase currents, leg voltages, the true and the reported
+rotor angle, the supply and the winding temperature. Through the same port, the app injects load and disturbance
+torque and sensor noise while the motor runs. The motor itself — its parameters, its non-idealities and any wiring
 fault — is fixed by the plant description it starts with.
 
-It replaces the former desktop simulator, which ran the control loops in isolation against the plant
+It replaces the former desktop simulator. That simulator ran the control loops in isolation against the plant,
 without the application, the CAN surface or the non-volatile memory.
 
 ```mermaid
@@ -89,11 +89,11 @@ graph LR
 ### Part A — One motor, one process
 
 Each virtual motor is a process of its own. The application relies on one event loop, one timer
-service and one trace output per program, as a board has one of each, and it is constructed once and
-never destroyed; one process per motor keeps all of that true without changing the application.
+service and one trace output per program, as a board has one of each. It is constructed once and
+never destroyed. One process per motor keeps all of that true without changing the application.
 
-The process boundary also gives the bench behaviour the user expects: a virtual motor that stops —
-crashed, killed, or powered off from the app — goes silent on the bus like a board that lost power,
+The process boundary also gives the bench behaviour the user expects. A virtual motor can stop because it
+crashed, was killed, or was powered off from the app. It then goes silent on the bus like a board that lost power,
 and the CAN Commander reports it offline after its usual timeout. Nothing else on the bus is affected.
 
 A virtual motor is started with:
@@ -101,7 +101,7 @@ A virtual motor is started with:
 | Start option   | Meaning                                                                                                                         | Default                   |
 |----------------|---------------------------------------------------------------------------------------------------------------------------------|---------------------------|
 | Bus            | Name of the virtual CAN bus to join: letters, digits, `-` and `_`                                                               | `default`                 |
-| Node           | The board ID the CAN node address is built from ([service-can.md](service-can.md) Part I)                                                       | 0                         |
+| Node           | The board ID the CAN node address is built from ([service-can.md](service-can.md) Part I)                                       | 0                         |
 | Plant          | A reference motor preset (`teknic`, `anaheim`), a text plant description or the emulated target's plant file                    | `teknic`                  |
 | Memory         | The file holding its non-volatile memory, a name in the working directory                                                       | one file per bus and node |
 | Start from     | Keep the memory file, start factory-fresh, or start calibrated for the plant                                                    | keep                      |
@@ -131,44 +131,50 @@ value of it. Load inertia is added to the rotor inertia, whichever line comes fi
 | `supply-voltage`   | The supply's voltage                          | V         |
 
 Every value except load inertia, viscous and Coulomb friction is finite and above zero; those three are finite
-and not negative. A file with an unknown key, a key given twice, a value that is not a number in range or a line
-without a value is refused, and the motor does not start: a mistake in a description never runs a different
-motor.
+and not negative. A file is refused, and the motor does not start, when it has any of these:
+
+- an unknown key;
+- a key given twice;
+- a value that is not a number in range;
+- a line without a value.
+
+Thus a mistake in a description never runs a different motor.
 
 ### Part B — The virtual board
 
 To the application the virtual board is one more platform, behind the same platform interfaces as the
 boards. What each service of the platform is on the virtual board:
 
-| Platform service        | On the virtual board                                                                                                                         |
-|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| Power stage and encoder | The shared plant drive (Part D)                                                                                                              |
-| Board protection        | The same simulated comparators the emulated target uses ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md) Part E), armed with the inverter                          |
-| Supply voltage          | The plant's supply model                                                                                                                     |
-| CAN bus                 | A participant of the virtual CAN bus (Part G), at the bit rate the application configures                                                    |
-| Non-volatile memory     | The memory file of the start options; every write reaches the file before it completes                                                       |
-| Status LEDs             | Three pins whose state the plant port publishes                                                                                              |
-| Terminal and trace      | The debug log, on the engine's standard output and, once the app attaches, through the plant port; there is no command line, as on the board |
-| Board ID                | The node of the start options                                                                                                                |
-| Board kind              | *virtual*, kind 6, which no release carries a firmware pack for                                                                              |
-| Reset                   | The process ends and is started again with the same options; the memory file survives                                                        |
-| Watchdog                | None: a stalled application is seen as a stalled real-time factor (Part C)                                                                   |
+| Platform service        | On the virtual board                                                                                                                                                        |
+|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Power stage and encoder | The shared plant drive (Part D)                                                                                                                                             |
+| Board protection        | The same simulated comparators the emulated target uses ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md) Part E), armed with the inverter |
+| Supply voltage          | The plant's supply model                                                                                                                                                    |
+| CAN bus                 | A participant of the virtual CAN bus (Part G), at the bit rate the application configures                                                                                   |
+| Non-volatile memory     | The memory file of the start options; every write reaches the file before it completes                                                                                      |
+| Status LEDs             | Three pins whose state the plant port publishes                                                                                                                             |
+| Terminal and trace      | The debug log, on the engine's standard output and, once the app attaches, through the plant port; there is no command line, as on the board                                |
+| Board ID                | The node of the start options                                                                                                                                               |
+| Board kind              | *virtual*, kind 6, which no release carries a firmware pack for                                                                                                             |
+| Reset                   | The process ends and is started again with the same options; the memory file survives                                                                                       |
+| Watchdog                | None: a stalled application is seen as a stalled real-time factor (Part C)                                                                                                  |
 
 **Firmware update.** Does not apply. A virtual motor's firmware is the application it was built with,
-and a newer one comes with a newer tool; the virtual board has no bootloader and no staging slot. The
+and a newer one comes with a newer tool. The virtual board has no bootloader and no staging slot. The
 CAN Commander shows its version and board kind and offers no update for it ([tool-can-commander.md](tool-can-commander.md)
 Part N).
 
-**Memory file.** The memory is 512 bytes, the size the boards' EEPROM regions are laid out in, kept in a
-file named after the bus and the node in the engine's working directory unless the start options name
-another. The memory file is always in the working directory: its name is letters, digits, `.`, `-` and `_`,
-not starting with `.`, and an engine given a path elsewhere refuses to start, so a start option never
-reads, overwrites or deletes a file outside the motor's own folder. A missing or short file is a factory-fresh board. *Start factory-fresh* replaces the file with
-an erased memory, so the motor needs calibrating from the CAN Commander, as a new board does.
-*Start calibrated* replaces it with the memory a board calibrated on this plant would hold: the
-complete calibration record (pole pairs, resistance, inductance, flux linkage, inertia, viscous and
-Coulomb friction, the current-sense offsets the board adds, and the encoder index angle when the
-encoder has one) and the configuration with the calibrated current-loop bandwidth. The motor reaches
+**Memory file.** The memory is 512 bytes, the size the boards' EEPROM regions are laid out in. It is kept in a
+file named after the bus and the node in the engine's working directory, unless the start options name
+another. The memory file is always in the working directory. Its name is letters, digits, `.`, `-` and `_`,
+not starting with `.`. An engine given a path elsewhere refuses to start. Thus a start option never
+reads, overwrites or deletes a file outside the motor's own folder. A missing or short file is a factory-fresh board.
+The *Start factory-fresh* option replaces the file with an erased memory, so the motor needs calibrating from the
+CAN Commander, as a new board does. The *Start calibrated* option replaces it with the memory a board calibrated on
+this plant would hold. This memory is the complete calibration record and the configuration with the calibrated
+current-loop bandwidth. The calibration record holds the pole pairs, resistance, inductance, flux linkage, inertia,
+viscous and Coulomb friction, and the current-sense offsets the board adds. It also holds the encoder index angle
+when the encoder has one. The motor reaches
 *Ready* in every control mode once aligned, with no identification run. Like *factory-fresh*, it
 applies to the first start only: a reset keeps the memory the application has written since.
 
@@ -180,7 +186,7 @@ virtual time is that of the model-in-the-loop tests ([software-in-the-loop.md](.
 order a board sees:
 
 1. For each control period of the millisecond (twenty at 20 kHz): the plant drive advances the plant
-   one period, then the control interrupt runs with the measured currents and angle, and its duties
+   one period. Then the control interrupt runs with the measured currents and angle. Its duties
    are applied, one period late when the plant description says so.
 2. The low-priority interrupt runs right after the control interrupt that triggered it, as it would on
    the board, where it pre-empts nothing but runs before the next control period.
@@ -206,27 +212,22 @@ sequenceDiagram
 ```
 
 **Pacing.** A pacer locks virtual time to the wall clock at a ratio of one. Each time it wakes it runs
-whole virtual milliseconds until virtual time has caught up with the wall clock. When it falls more
-than 50 ms behind it does not try to catch up: it drops the backlog, counts an overrun and continues
-from the present, so a slow machine produces a motor that runs late, never one that runs in bursts.
-The plant port publishes the real-time factor and the overrun count. On Windows the program asks for a
-1 ms system timer, so the pacer wakes when it is due rather than on the default 15.6 ms tick.
+whole virtual milliseconds until virtual time has caught up with the wall clock. When it falls more than 50 ms behind, it does not try to catch up. It drops the backlog, counts an overrun and
+continues from the present. Thus a slow machine produces a motor that runs late, never one that runs in bursts.
+The plant port publishes the real-time factor and the overrun count. On Windows the program asks for a 1 ms system timer. Thus the pacer wakes when it is due rather than on the default 15.6 ms tick.
 
-**Pause and step.** Pausing stops virtual time. A paused motor sends nothing and discards the frames that
-reach it, so the CAN Commander sees it go offline after its liveness timeout, exactly as when a board's
-cable is pulled; resuming continues from the paused instant without catching up and without counting an
+**Pause and step.** Pausing stops virtual time. A paused motor sends nothing and discards the frames that reach it. Thus the CAN Commander sees it go offline
+after its liveness timeout, exactly as when a board's cable is pulled. Resuming continues from the paused instant without catching up and without counting an
 overrun. While paused, the app can advance one control period or
-one millisecond at a time to inspect a capture. There is no slow motion or fast forward while on a
-bus: the CAN Commander's timeouts run on the wall clock, and a motor whose clock ran at another rate
+one millisecond at a time to inspect a capture. There is no slow motion or fast forward while on a bus. The CAN Commander's timeouts run on the wall clock, and a motor whose clock ran at another rate
 would read as faulty.
 
 ### Part D — The plant is shared
 
-Three users drive the same plant model through the same **plant drive**: the emulated target of the
-software-in-the-loop suite, the host model-in-the-loop tests and the virtual board. The plant drive
-owns the plant model, steps it once per control period, applies the duties a period late when asked,
-keeps the low-side shunts readable, fires scheduled torque steps and encoder freezes, and records the
-trajectory. It is configured from one plant description format, so a plant field added for one user
+Three users drive the same plant model through the same **plant drive**. They are the emulated target of the
+software-in-the-loop suite, the host model-in-the-loop tests and the virtual board. The plant drive owns the plant model and steps it once per control period. It applies the duties a period late
+when asked, and keeps the low-side shunts readable. It also fires scheduled torque steps and encoder freezes, and
+records the trajectory. It is configured from one plant description format, so a plant field added for one user
 reaches the others.
 
 Moving the plant drive out of its two former copies left every metric of the host suite as it was
@@ -234,9 +235,7 @@ Moving the plant drive out of its two former copies left every metric of the hos
 
 ### Part E — Torque and noise while running
 
-While the motor runs, the plant port changes only what acts on the motor from outside: torque on the
-shaft, the shaft's speed when something else drives it, and noise on the sensors. A change is queued and applied at the start of the next control period,
-never inside one; the pacer is the only writer of the plant's state.
+While the motor runs, the plant port changes only what acts on the motor from outside. This is the torque on the shaft, the shaft's speed when something else drives it, and noise on the sensors. A change is queued and applied at the start of the next control period, never inside one. The pacer is the only writer of the plant's state.
 
 | Group         | Change                                                               | Plant part       |
 |---------------|----------------------------------------------------------------------|------------------|
@@ -255,29 +254,35 @@ The forms of external torque, each timed from the control period it takes effect
 | Ramp     | From the start value to the end value, linearly over the duration, then the end value |
 | Sine     | The offset plus the amplitude times the sine of 2π times the frequency times the time |
 
-A change is refused, and the plant left as it was, when a value is not finite, a standard deviation is
-negative, a delay is negative, a duration is not positive, or a frequency is not between zero and a
-tenth of the control rate. While an external torque is in force it replaces the torque steps the plant
+A change is refused, and the plant left as it was, when any of these holds:
+
+- a value is not finite;
+- a standard deviation is negative;
+- a delay is negative;
+- a duration is not positive;
+- a frequency is not between zero and a tenth of the control rate.
+
+While an external torque is in force it replaces the torque steps the plant
 description schedules.
 
 **Shaft drive.** A machine the motor is coupled to, one that integrates its own dynamics, can drive the
 shaft at a speed it sends. While driven, the shaft's speed is set every
-control period and its angle advances from it; the plant's inertia, friction, load, external torque and
+control period and its angle advances from it. The plant's inertia, friction, load, external torque and
 cogging no longer move it. The motor still computes its electrical torque and streams it, which is what
 the driving machine reads back. A drive or release takes effect at the start of the next control period,
-as every change does; a release returns the shaft to the plant's own dynamics, starting from the speed it
+as every change does. A release returns the shaft to the plant's own dynamics, starting from the speed it
 had. Clear all releases the shaft, and profiles do not carry the drive: it belongs to the machine that
 sends it, not to a bench disturbance.
 
-The driving machine computes each speed from an electrical torque it read in a window, and the plant
-port is serviced once per millisecond, so the speed arrives one to two milliseconds after the torque it
-was computed from. That lag sits inside the motor's own fast mechanical loop: while the alignment holds
+The driving machine computes each speed from an electrical torque it read in a window. The plant
+port is serviced once per millisecond. Thus the speed arrives one to two milliseconds after the torque it
+was computed from. That lag sits inside the motor's own fast mechanical loop. While the alignment holds
 the rotor on a stiff electrical spring, a torque that reaches the shaft's speed late acts as negative
-damping, so the rotor rings and the alignment can fail. The motor therefore closes the gap itself. With
-the speed, the machine sends the control period of the sample it used (a window's first period plus its
-periods minus one), the shaft's apparent inertia $J$, and the load torque $\tau_{load}$ it found on the
-shaft at that sample: the electrical torque it used less what accelerated $J$ in its own solve, so the
-torque that would have left the shaft's speed unchanged. In every control period $n$ the shaft is driven,
+damping. Thus the rotor rings and the alignment can fail. The motor therefore closes the gap itself. With
+the speed, the machine sends three values. The first is the control period of the sample it used: a window's
+first period plus its periods minus one. The second is the shaft's apparent inertia $J$. The third is the load
+torque $\tau_{load}$ it found on the shaft at that sample. This load torque is the electrical torque it used less
+what accelerated $J$ in its own solve. Thus it is the torque that would have left the shaft's speed unchanged. In every control period $n$ the shaft is driven,
 its speed is
 
 $$
@@ -285,49 +290,43 @@ $$
 $$
 
 where $\tau_e(k)$ is the electrical torque of the Data Model in period $k$ and $\Delta t$ is one control
-period: the speed the machine would have reached had it seen every torque since its sample while the load
+period. This is the speed the machine would have reached had it seen every torque since its sample while the load
 stayed as it was. A machine that sends the electrical torque it used in place of the load stops the
-shaft's acceleration at each speed it sends, and when its next speed comes late the gap reaches the
+shaft's acceleration at each speed it sends. When its next speed comes late, the gap reaches the
 alignment's spring as a kick. The motor
-keeps the electrical torque of its last 1,024 control periods, and older periods add nothing; a used
+keeps the electrical torque of its last 1,024 control periods, and older periods add nothing. A used
 period not yet reached adds nothing either. Between two requests the sum grows by one term each period.
 The speed listed in the changes in force is the speed sent. A drive whose speed or torque is not finite,
-or whose inertia is not finite and positive, is refused; a release ignores every field but the drive
+or whose inertia is not finite and positive, is refused. A release ignores every field but the drive
 flag.
 
-The motor's intrinsic parameters — resistance, inductances, flux linkage, pole pairs, inertia,
-friction, cogging — and its non-idealities and wiring faults (sensor bias, encoder resolution, a stuck
-encoder, an open phase, a weak supply) never change while it runs. They come from the plant
+The motor's intrinsic parameters (resistance, inductances, flux linkage, pole pairs, inertia,
+friction, cogging) never change while it runs. Its non-idealities and wiring faults (sensor bias, encoder
+resolution, a stuck encoder, an open phase, a weak supply) do not change either. They come from the plant
 description it starts with; another motor is another description and a restart. An identification
 then always has one right answer, the description's.
 
 Every active change is listed by the plant port, and one request clears all of them, returning the
 plant to its description.
 
-**Disturbance profiles.** A profile is a timed list of torque and noise changes, relative to its start
-or to a trigger (a speed or current threshold, the drive entering a state the LEDs show). It is the bench
+**Disturbance profiles.** A profile is a timed list of torque and noise changes, relative to its start or to a trigger. A trigger is a speed or current threshold, or the drive entering a state the LEDs show. It is the bench
 counterpart of the scheduled disturbances of the scenarios ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md) Part H): with
-the same seed and profile a run replays exactly. Profiles are files the app loads and saves; the virtual
-motor runs them, so each change lands on the control period its time names, whatever the wall clock or
-the connection does. A profile holds up to 1,024 changes, each timed in control periods after the trigger
-and none before the one listed ahead of it; every change is checked as Part E checks a single one, and a
-profile with one change out of range is refused whole. A new profile replaces a running one. Stopping a
-profile returns the plant to its description; a profile that finishes, or whose app goes away, stops, and
-what it applied stays in force, as the changes the app made do.
+the same seed and profile a run replays exactly. Profiles are files the app loads and saves. The virtual motor runs them, so each change lands on the control period its time names, whatever the wall clock or
+the connection does. A profile holds up to 1,024 changes, each timed in control periods after the trigger. No change is timed before the one listed ahead of it. Every change is checked as Part E checks a single one, and a
+profile with one change out of range is refused whole. A new profile replaces a running one. Stopping a profile returns the plant to its description. A profile that finishes, or whose app goes away, stops.
+What it applied then stays in force, as the changes the app made do.
 
 ### Part F — The plant port
 
 The plant port is a local connection between one virtual motor and the Virtual Motor app. It carries
 three things.
 
-**Continuous stream.** While the app asks for it, every 10 control periods (2 kHz at 20 kHz) the virtual
-motor publishes, for each signal of the Data Model, the minimum and the maximum over the window, so a
-2 kHz trace still shows the switching ripple's envelope and the noise's spread. A reader that falls behind loses
+**Continuous stream.** While the app asks for it, the virtual motor publishes every 10 control periods (2 kHz at 20 kHz). For each
+signal of the Data Model, it publishes the minimum and the maximum over the window. Thus a 2 kHz trace still shows the switching ripple's envelope and the noise's spread. A reader that falls behind loses
 whole windows, counted in a sequence number, and never delays the pacer. The app turns the stream on while
 it shows a trace and off when it shows none, so a motor nobody watches samples nothing.
 
-**Captures.** On request the virtual motor records every control period's signals, up to 16,384
-periods, around a trigger: a signal crossing a level in a direction, a protection trip, a fault the LEDs
+**Captures.** On request the virtual motor records every control period's signals, up to 16,384 periods, around a trigger. The trigger is a signal crossing a level in a direction, a protection trip, a fault the LEDs
 show, or immediately. The request names the share of the capture before the trigger. A capture is
 delivered once complete.
 
@@ -346,29 +345,26 @@ A trigger watches only the periods after the request: a level already crossed, o
 does not fire it.
 
 **Capture delivery.** A capture keeps the periods before the trigger, up to its pre-trigger share,
-from those it saw since it was armed, so a trigger that fires early yields a capture with fewer periods
-before it. Once complete it travels as chunks of at most 512 control periods, every chunk naming the
-capture, so the app can place each one and knows the capture is whole once every period has come. Chunks
+from those it saw since it was armed. Thus a trigger that fires early yields a capture with fewer periods
+before it. Once complete, it travels as chunks of at most 512 control periods, and every chunk names the capture. Thus the
+app can place each one, and knows the capture is whole once every period has come. Chunks
 are queued like every frame but windows: a capture is never dropped. A new capture request replaces an
 armed or recording one, and the connection ending cancels it.
 
-**Control and status.** Pause, resume, step, the torque and noise changes of Part E, profiles, and the
-status: virtual time, real-time factor, overruns, LED states, board protection state and the debug log
+**Control and status.** Pause, resume, step, the torque and noise changes of Part E, profiles, and the status. The status is virtual time, real-time factor, overruns, LED states, board protection state and the debug log
 lines.
 
 **Connection.** The app listens on one loopback port for all its motors. A virtual motor started with a
-plant port connects to it before it joins the bus and introduces itself; one it cannot reach does not
-start. When the connection ends, the motor carries on without it, and a paused motor resumes, so a
+plant port connects to it before it joins the bus and introduces itself. A virtual motor that cannot reach its plant port does not start. When the connection ends, the motor carries on without it, and a paused motor resumes, so a
 motor whose app has gone never hangs.
 
 **Version.** Hello names the protocol version: 3, since Changes also carries the shaft drive of Part E,
-appended after its other fields. Version 2 added a window's last control period, so a reader can pair
+appended after its other fields. Version 2 added a window's last control period. Thus a reader can pair
 signals sampled in the same period, such as the stator voltage α and β.
 
 **Frames.** Each message is one frame: its type in one byte, the length of its payload in two bytes, then
 the payload. Numbers are little-endian, reals are single-precision IEEE 754, and a text is its length in
-one byte followed by that many characters. A frame of a type the reader does not know is skipped by its
-length, so either side may add types; a frame of a known type whose payload is shorter than its fields
+one byte followed by that many characters. A frame of a type the reader does not know is skipped by its length, so either side may add types. A frame of a known type whose payload is shorter than its fields
 ends the connection.
 
 Motor to app:
@@ -404,18 +400,17 @@ App to motor:
 | `0x93` | Profile         | Trigger, number of changes (2 bytes), then each change: its control period after the trigger (4 bytes), the type of the change request (`0x84` to `0x87`) and that request's payload |
 | `0x94` | Stop profile    | None: the profile stops and the plant returns to its description                                                                                                                     |
 
-The run state is running or paused; the LEDs are one bit each, operational, warning and failure from the
-lowest; the board protection state is clear, asserted or unknown, as the drive reads it. A refusal names
+The run state is running or paused. The LEDs are one bit each, operational, warning and failure from the lowest.
+The board protection state is clear, asserted or unknown, as the drive reads it. A refusal names
 one reason: a value out of range, a step while running, or a form the motor does not know. A trigger
 is its kind (immediately, rising, falling, either, protection, LEDs), the signal's place in the Data
-Model, the level, and the LED mask, each sent whatever the kind uses. Every accepted profile change is
+Model, the level, and the LED mask. Each field is sent, whatever the kind uses. Every accepted profile change is
 followed by the changes in force, as a change the app asked for is.
 
-**Windows and dropping.** Windows are consecutive runs of 10 control periods counted from the period the
-stream was turned on in; a step while paused completes them as it goes. The sequence counts every window
+**Windows and dropping.** Windows are consecutive runs of 10 control periods counted from the period the stream was turned on in. A step while paused completes them as it goes. The sequence counts every window
 the motor closed since the stream was turned on, sent or not. Frames the connection cannot take at once
-wait in the motor in their order; a window is dropped instead of queued while a whole window's worth is
-still waiting, so a slow reader sees gaps in the sequence and the motor never waits for it. Every other
+wait in the motor in their order. While a whole window's worth is still waiting, a window is dropped instead of
+queued. Thus a slow reader sees gaps in the sequence, and the motor never waits for it. Every other
 frame is queued, never dropped. The stream stops when it is turned off or the connection ends.
 
 ### Part G — The virtual CAN bus
@@ -438,8 +433,7 @@ rate.
   when no hub is listening, so headless runs need no app. When the hub stops, every participant sees
   its bus closed; the CAN Commander reports the disconnect as for an unplugged adapter.
 
-The participant side is an adapter of can-lite's host adapter composition, beside SocketCAN and slcan,
-so the CAN Commander reaches a virtual bus as `virtual:<bus name>` in its Interface box
+The participant side is an adapter of can-lite's host adapter composition, beside SocketCAN and slcan. Thus the CAN Commander reaches a virtual bus as `virtual:<bus name>` in its Interface box
 ([tool-can-commander.md](tool-can-commander.md) Part I) with no adapter code of its own.
 
 ### Part H — Lifecycle
@@ -465,16 +459,15 @@ its debug log.
 
 **Restarting.** On Linux a restart replaces the program inside its own process, so the app keeps the
 process it started. Windows cannot replace a running program, so there the virtual motor program runs the
-motor as its child process and waits for it. A motor that asks to restart ends with an exit code kept for
-that, and the program starts it again with the same options, marked as restarted, the memory file kept;
-any other ending becomes the program's own. The child belongs to a job that ends with the program, so
+motor as its child process and waits for it. A motor that asks to restart ends with an exit code kept for that. The program then starts it again with the same options, marked as
+restarted, and keeps the memory file. Any other ending becomes the program's own. The child belongs to a job that ends with the program, so
 powering a motor off, which ends the program, never leaves the motor running.
 
 ### Part I — Fidelity, and what a virtual motor is not
 
 A virtual motor is the shipping application, but not the shipping binary. It is compiled for the host,
-without the target's floating-point options; its control interrupt never pre-empts the low-priority
-interrupt or the event loop part-way; and its CAN latency is the hub's model, not a controller's. A
+without the target's floating-point options. Its control interrupt never pre-empts the low-priority
+interrupt or the event loop part-way. Its CAN latency is the hub's model, not a controller's. A
 behaviour seen only on a virtual motor is a lead to reproduce under software-in-the-loop or on hardware,
 never a verdict. A small set of scenarios runs against virtual motors in CI ([integration-testing.md](../verification_and_validation/integration-testing.md))
 so that the virtual board cannot drift from the emulated one unnoticed.
@@ -485,12 +478,12 @@ so that the virtual board cannot drift from the emulated one unnoticed.
 
 ### Provided
 
-| Interface       | Purpose                                           | Contract                                                                          |
-|-----------------|---------------------------------------------------|-----------------------------------------------------------------------------------|
-| CAN node        | The drive's whole command and telemetry surface   | The FOC motor CAN category, unchanged ([service-can.md](service-can.md)), on the virtual bus      |
-| Virtual CAN hub | Shared buses for virtual motors and commanders    | Part G; loopback only                                                             |
-| Plant port      | Plant signals, captures, torque and noise, status | Part F; one reader; a slow reader loses windows, never slows the motor            |
-| Start options   | Headless start by a script, a CI job or the app   | Part A; an invalid option ends the process with a message before it joins the bus |
+| Interface       | Purpose                                           | Contract                                                                                     |
+|-----------------|---------------------------------------------------|----------------------------------------------------------------------------------------------|
+| CAN node        | The drive's whole command and telemetry surface   | The FOC motor CAN category, unchanged ([service-can.md](service-can.md)), on the virtual bus |
+| Virtual CAN hub | Shared buses for virtual motors and commanders    | Part G; loopback only                                                                        |
+| Plant port      | Plant signals, captures, torque and noise, status | Part F; one reader; a slow reader loses windows, never slows the motor                       |
+| Start options   | Headless start by a script, a CI job or the app   | Part A; an invalid option ends the process with a message before it joins the bus            |
 
 ### Required
 

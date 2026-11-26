@@ -47,14 +47,14 @@ date: 2026-11-26
 An incremental encoder counts from wherever it was at power-up, so the frame the alignment sets
 (`service-alignment.md`) is lost on every reset. The index channel is a mark on the encoder disc: one pulse per
 revolution, always at the same mechanical position. The angle between that mark and the electrical zero the
-alignment found is a property of the assembled motor, not of the power-up, so it can be measured once and
-stored with the calibration record. After a reset, one pass over the index tells the drive where the mark is
-in the new count, and the stored angle places the electrical zero relative to it
-(`theory/alignment.md` §7).
+alignment found is a property of the assembled motor, not of the power-up. It can therefore be measured once
+and stored with the calibration record. After a reset, one pass over the index tells the drive where the
+mark is in the new count. The stored angle places the electrical zero relative to it (`theory/alignment.md`
+§7).
 
-The search reads the encoder at the pulse, not the field's angle, so the result does not depend on how far the
-rotor lags the field: friction, cogging and a load that the alignment's settled position absorbs as an error
-do not enter it.
+The search reads the encoder at the pulse, not the field's angle. The result therefore does not depend on how
+far the rotor lags the field. Friction, cogging and a load that the alignment's settled position absorbs as an
+error do not enter it.
 
 ### Part B — The search
 
@@ -66,19 +66,19 @@ phase-current interrupt at the inverter's base frequency, so the index is polled
    so `d = 2·I·R/Vdc`. The search current is 0.6 A, or a quarter of the inverter's maximum if that is less.
    Without a positive resistance and bus voltage the amplitude is unknown and the search refuses to start.
 2. **Hold.** The vector is held at electrical angle zero for 200 ms. A rotor anywhere else snaps to it, turning
-   up to half an electrical turn either way; an index pulse it passes on the way would be seen from the wrong
-   side, so the index is armed only when the hold ends.
+   up to half an electrical turn either way. An index pulse it passes on the way would be seen from the wrong
+   side. The index is therefore armed only when the hold ends.
 3. **Turn.** The vector turns forward at half a mechanical revolution per second (`π·p` rad/s electrical).
-   The rotor follows it like a stepper: at that speed the back-EMF and the winding's reactance are a small part
-   of the resistive drop, so the current stays close to the sized one.
+   The rotor follows it like a stepper. At that speed the back-EMF and the winding's reactance are a small part
+   of the resistive drop. The current therefore stays close to the sized one.
 4. **Index.** At the first control period that sees the index, the encoder is read and the vector stops
    turning; it keeps holding the rotor where it is. The reading is handed to the event loop.
 5. **Reference.** On the event loop, when the caller gave a stored index angle, the encoder is set so that the
    reading taken at the pulse becomes that angle: the current reading is shifted by the stored angle less the
    pulse reading. Only then is the inverter stopped and the completion delivered.
 
-The search always turns forward, at commissioning and at power-up alike, so it always meets the same edge of the
-pulse and its width does not separate the two readings.
+The search always turns forward, at commissioning and at power-up alike. It therefore always meets the same edge
+of the pulse, and its width does not separate the two readings.
 
 ```mermaid
 stateDiagram-v2

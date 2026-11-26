@@ -83,10 +83,10 @@ translates each command the server decodes into the matching state machine call:
   it completes the external calibration with the offsets in the data; this aligns the rotor and persists.
   On failure it answers *invalidState*, *calibrationFailed* or *busy*. Every failure that leaves the
   reservation in place releases the reservation, so the node returns to Ready or Idle. These failures are
-  a rotor that does not come to rest, a failed offset measurement, a poor R/L fit, no pole-pair estimate
-  (or one that does not fit the calibration record's byte) and a rejected completion. A request that finds
-  its previous run abandoned by an emergency stop or a fault (the reservation gone, the estimation never
-  answered) starts afresh instead of answering *busy*. The command covers the electrical steps only. It
+  a rotor that does not come to rest, a failed offset measurement and a poor R/L fit. A missing pole-pair
+  estimate, or one that does not fit the calibration record's byte, is also such a failure, as is a
+  rejected completion. An emergency stop or a fault can abandon a previous run: the reservation is gone and
+  the estimation never answered. A request that finds such a run starts afresh instead of answering *busy*. The command covers the electrical steps only. It
   never drives the mechanical estimator, so speed and position end in Idle reporting *partialCalibration*,
   while torque reaches Ready.
 - RequestTelemetry → the bridge broadcasts the current state and fault code in the telemetry status
@@ -99,8 +99,9 @@ translates each command the server decodes into the matching state machine call:
   run, so a refused selection is visible as the unchanged algorithm.
 - SetParameter → by parameter group:
   - a tuning setting: the bridge takes the loop's stored settings, replaces the one field and hands the whole
-    record to the control mode, which validates it (ranges, switching gain below boundary layer, position
-    design feasibility), applies it to the running controller when stopped and stores it;
+    record to the control mode. The control mode validates it (ranges, switching gain below boundary
+    layer, position design feasibility). It applies the record to the running controller when stopped and
+    stores it;
   - a motor parameter: the control mode sends the motor parameter change to the lifecycle, which stores the
     edited calibration record and re-applies the model ([state-machine.md](state-machine.md)); the operator's
     tuning settings are re-applied on top, because applying a model re-derives the loop tunings;
@@ -118,10 +119,11 @@ translates each command the server decodes into the matching state machine call:
   - a motor parameter from the calibration record in RAM: 0 while unknown; an unset flux linkage reports
     the platform's default, flagged automatic;
   - a start-up setting or the telemetry rate from the stored configuration.
-  The read-only parameters report, never flagged automatic: the current offsets and the cogging-map peak
-  from the calibration record in RAM; the active mode's online estimates (0 in torque mode, which runs
-  none); the control-loop statistics of the platform diagnostics; and the reset cause the platform reported
-  at start-up.
+  The read-only parameters report, never flagged automatic:
+  - the current offsets and the cogging-map peak from the calibration record in RAM;
+  - the active mode's online estimates (0 in torque mode, which runs none);
+  - the control-loop statistics of the platform diagnostics;
+  - the reset cause the platform reported at start-up.
 - Calibrate → calibration on the active mode's state machine, answered when the sequence ends: success,
   *invalidState* when the drive is not stopped, the category error the sequence ended with otherwise.
 - ClearCalibration → calibration clear, answered once the record is invalidated and the drive is back in
@@ -162,13 +164,13 @@ reservation is an identification the client started, which may be spinning the m
 traces and issues an emergency stop, which stops the inverter. A calibration the drive runs itself, started
 with Calibrate, is left alone. When the drive is otherwise not running, the watchdog ignores the
 notification. A bus that goes quiet while the motor is stopped is not a hazard, and a fault there would
-obstruct commissioning. An identification acknowledges only when it ends, so a client waiting on one keeps
-sending frames; the CAN protocol client sends a heartbeat every heartbeat interval for this.
+obstruct commissioning. An identification acknowledges only when it ends. A client waiting on one therefore keeps
+sending frames: the CAN protocol client sends a heartbeat every heartbeat interval for this.
 
 The instantiation layer composes it alongside the CAN bridge, so the bridge and category server stay free of lifecycle policy.
 
 **Command timeout.** Liveness alone does not catch a client whose application hangs while its CAN stack
-keeps running: the heartbeat goes on, the client never goes offline, and the drive keeps executing its last
+keeps running. The heartbeat goes on, the client never goes offline, and the drive keeps executing its last
 setpoint. The command timeout monitor watches what the client asks for instead (REQ-LCY-005). The bridge tells
 it of every accepted Start and every accepted torque, speed or position setpoint; nothing else counts, the
 heartbeat included. Every 1 ms on the event loop, the monitor checks the drive. It checks while the drive is
@@ -182,8 +184,8 @@ finds out why when it comes back.
 |-----------------|---------|----------|----------------------------------------------------------------|
 | Command timeout | 0 (off) | 0 – 60 s | Longest silence of Start and setpoints a running drive accepts |
 
-The timeout is off by default because a client that commands one setpoint and then only watches, as the CAN
-Commander does, is a legitimate use; a client that streams setpoints sets it to a few of its periods. While
+The timeout is off by default. A client that commands one setpoint and then only watches, as the CAN
+Commander does, is a legitimate use. A client that streams setpoints sets it to a few of its periods. While
 the timeout is zero the count keeps restarting, so a timeout written while the drive runs counts from the write.
 A drive enabled from the terminal is watched the same way: with a timeout set, it needs setpoints over CAN.
 
@@ -206,18 +208,19 @@ when the bus is busiest and the notification matters most. The payload is a Tele
 *fault* state and the fault code.
 
 Arbitration only helps a frame that reaches the controller. The can-lite send queue therefore orders queued
-frames by priority, keeps two of its slots for emergency frames only, and lets an emergency frame displace the
-newest lowest-priority frame when it is full, so a fault notification is not refused behind queued telemetry.
+frames by priority and keeps two of its slots for emergency frames only. When the queue is full, an emergency
+frame displaces the newest lowest-priority frame. Thus the queue does not refuse a fault notification behind
+queued telemetry.
 
 ### Part H — Tracing Decorators
 
 All tracing is applied through can-lite's tracing decorators:
 
-| Decorator              | Wraps                | Traces                                                              |
-|------------------------|----------------------|---------------------------------------------------------------------|
-| Frame tracer           | The CAN bus driver   | Every raw CAN frame sent and received, except current-stream frames |
-| Server observer tracer | The protocol server  | Server online/offline events                                        |
-| Client observer tracer | The protocol client  | Server online/offline, ACK timeouts per node                        |
+| Decorator              | Wraps               | Traces                                                              |
+|------------------------|---------------------|---------------------------------------------------------------------|
+| Frame tracer           | The CAN bus driver  | Every raw CAN frame sent and received, except current-stream frames |
+| Server observer tracer | The protocol server | Server online/offline events                                        |
+| Client observer tracer | The protocol client | Server online/offline, ACK timeouts per node                        |
 
 The instantiation layer composes these in the CAN stack of the application logic. Thus the production code paths gain full observability without any tracing logic in the category or the bridge.
 
@@ -228,9 +231,9 @@ of about 120 characters. A 1 kHz stream alone would thus need about 120 kB/s of 
 
 ### Part I — Node Address
 
-Each controller answers on one CAN node ID, fixed once at boot: the configured base from the
-non-volatile configuration (the CAN node ID base, default 1) plus the board ID read from the board's ID
-jumpers. Boards that run the same firmware and configuration can therefore share a bus once their
+Each controller answers on one CAN node ID, fixed once at boot. The node ID is the configured base from the
+non-volatile configuration (the CAN node ID base, default 1) plus the board ID. The board ID comes from the
+board's ID jumpers. Boards that run the same firmware and configuration can therefore share a bus once their
 jumpers differ.
 
 The jumpers are sampled once, during platform start-up, after their pull-ups have had time to
@@ -248,10 +251,10 @@ flowchart LR
     V -- no --> D["node = 1 + board ID"]
 ```
 
-| Platform                                         | ID inputs                                                                 | Board ID |
-|--------------------------------------------------|---------------------------------------------------------------------------|----------|
-| Board with three ID inputs                       | Three inputs, one per bit; a jumper or closed switch to ground sets a bit | 0–7      |
-| Board with no ID inputs, host, emulated target   | none                                                                      | 0        |
+| Platform                                       | ID inputs                                                                 | Board ID |
+|------------------------------------------------|---------------------------------------------------------------------------|----------|
+| Board with three ID inputs                     | Three inputs, one per bit; a jumper or closed switch to ground sets a bit | 0–7      |
+| Board with no ID inputs, host, emulated target | none                                                                      | 0        |
 
 With the default base, eight boards with ID inputs set to 0–7 answer as nodes 1–8, the
 most one bus carries (can-lite tracks eight servers).
@@ -265,7 +268,7 @@ asked.
 **Window.** The control interrupt adds each sample's measured Id and Iq to the stream window. These are the
 Park transform's output, not the references. A window is N control periods, N = round(f_control / rate), so
 the effective rate is f_control / N. On the 20 kHz loop this is exactly the configured rate at 1000, 500,
-250, 200 or 100 Hz, and 298.5 Hz (N = 67) for a configured 300 Hz. At the window's last sample the interrupt
+250, 200 or 100 Hz. For a configured 300 Hz it is 298.5 Hz (N = 67). At the window's last sample the interrupt
 stores the two means and that sample's mechanical angle in a sixteen-entry ring and starts the next window.
 The mean is the anti-aliasing filter of the stream. A 1 kHz stream of single samples would fold the
 switching ripple and the sensor noise into its band. The window average has a null at every multiple of the
@@ -273,10 +276,10 @@ stream rate. The interrupt does a few additions per sample and nothing while the
 ([performance optimization](../performance-optimization/README.md)).
 
 **Sequence.** Every window the interrupt closes takes the next value of an 8-bit counter, whether or not its
-frame reaches the bus: a window lost to a full ring or to a full send queue is a gap in the sequence, never a
-silently shifted sample. The counter wraps after 256 windows (256 ms at 1 kHz), so a client also uses the
-arrival time to tell a long outage from a wrap. Windows are counted only while a control loop runs: a stop
-and a later start show as a pause in arrival, not as a gap.
+frame reaches the bus. A window lost to a full ring or to a full send queue is a gap in the sequence, never a
+silently shifted sample. The counter wraps after 256 windows (256 ms at 1 kHz). A client therefore also uses
+the arrival time to tell a long outage from a wrap. The interrupt counts windows only while a control loop
+runs. A stop and a later start show as a pause in arrival, not as a gap.
 
 **When it runs.** The stream runs while all of these hold:
 
@@ -288,14 +291,14 @@ and a later start show as a pause in arrival, not as a gap.
 The open-loop steps (alignment, resistance and inductance injection) and a stopped drive produce no windows.
 
 **Rate.** The rate is the telemetry rate of the configuration record, read and written as the parameter
-*telemetryRate* (Part A, contract 3.0): 0 stops the stream, 1–1000 Hz runs it; any other value is answered
-*invalidPayload* and changes nothing. A stored change takes effect within one millisecond. The default record
+*telemetryRate* (Part A, contract 3.0). A rate of 0 stops the stream, and 1–1000 Hz runs it. Any other value
+is answered *invalidPayload* and changes nothing. A stored change takes effect within one millisecond. The default record
 holds 100 Hz.
 
 **Sending.** An event-loop timer drains the ring every millisecond and hands each sample to the send queue
 at telemetry priority (12). At most two stream frames are in the send queue at once. This leaves the other
 ordinary slots of can-lite's queue to responses and acknowledgements. A sample that finds two frames waiting
-stays in the ring for the next tick, and the ring holds sixteen milliseconds of samples at 1 kHz.
+stays in the ring for the next tick. The ring holds sixteen milliseconds of samples at 1 kHz.
 Stream frames are not traced (Part H).
 
 ```mermaid
@@ -321,8 +324,8 @@ sequenceDiagram
     Q-->>TMR: sent, one fewer frame waiting
 ```
 
-**Bus budget.** One TelemetryCurrents frame has a 29-bit identifier and seven data bytes: 123 bits
-nominal, 150 with worst-case bit stuffing (110 stuffable bits, at most 27 stuff bits).
+**Bus budget.** One TelemetryCurrents frame has a 29-bit identifier and seven data bytes. It is 123 bits
+nominal, and 150 with worst-case bit stuffing (110 stuffable bits, at most 27 stuff bits).
 
 | Bitrate    | One node at 1 kHz | One node at 500 Hz | Stream frames per second within 70 % |
 |------------|-------------------|--------------------|--------------------------------------|
@@ -331,25 +334,25 @@ nominal, 150 with worst-case bit stuffing (110 stuffable bits, at most 27 stuff 
 | 250 kbit/s | 49.2–60 %         | 24.6–30 %          | 1166                                 |
 | 125 kbit/s | does not fit      | 49.2–60 %          | 583                                  |
 
-Several drives share one bus, so the budget is the sum over every node: Σ rate × 150 bit shall stay at or
-below 70 % of the bitrate, which leaves the rest for commands, responses, acknowledgements and heartbeats.
-Nine drives at 1 kHz need 1.11–1.35 Mbit/s and do not fit any classic CAN bitrate; nine at 500 Hz on
+Several drives share one bus, so the budget is the sum over every node. The sum Σ rate × 150 bit shall stay
+at or below 70 % of the bitrate. This leaves the rest for commands, responses, acknowledgements and heartbeats.
+Nine drives at 1 kHz need 1.11–1.35 Mbit/s and do not fit any classic CAN bitrate. Nine at 500 Hz on
 1 Mbit/s take 67.5 % worst case, as do nine at 250 Hz on 500 kbit/s.
 
 Stream frames (priority 12) win arbitration over heartbeats (priority 16). On an over-subscribed bus an idle
 client's heartbeats starve. Every drive then declares the client gone after the client timeout (3 s) and
 stops its motor (Part F). A node sees only its own traffic and cannot measure the bus load, so it does not
-throttle itself: choosing the rates within the budget is the integrator's job.
+throttle itself. Choosing the rates within the budget is the integrator's job.
 
 ### Part K — Firmware Upgrade Category
 
 The drive's protocol server registers a second category beside the FOC motor category: the can-lite
-firmware-upgrade category (0x1), on the same node ID, with the firmware upgrade service as its observer
+firmware-upgrade category (0x1), on the same node ID. Its observer is the firmware upgrade service
 ([service-firmware-upgrade.md](service-firmware-upgrade.md)). Its commands carry no sequence byte, as the
 can-lite specification defines. Thus they do not take part in the FOC motor category's sequence bookkeeping.
 The server's rate limit of 500 commands a second covers both categories. While a pack is received, the bridge
-answers *busy* to every command that writes the configuration record: start-up settings, the telemetry rate
-and the fault supervision settings. The control-mode state machine refuses the commands that start the drive
+answers *busy* to every command that writes the configuration record. These are the start-up settings, the
+telemetry rate and the fault supervision settings. The control-mode state machine refuses the commands that start the drive
 or asynchronous work, because the download counts as pending work. A pack that is staged, waiting for the user
 to apply it, holds nothing. EmergencyStop is always accepted.
 
@@ -365,14 +368,14 @@ to apply it, holds nothing. EmergencyStop is always accepted.
 
 ### Required
 
-| Interface                  | Purpose                            | Contract                                                              |
-|----------------------------|------------------------------------|-----------------------------------------------------------------------|
-| CAN frame transport        | Sends and receives raw CAN frames  | Provided by can-lite; constructed before the category objects         |
-| FOC motor category server  | Decodes the category's commands    | Provided by e-foc-protocol; the CAN bridge is its only observer       |
+| Interface                  | Purpose                            | Contract                                                               |
+|----------------------------|------------------------------------|------------------------------------------------------------------------|
+| CAN frame transport        | Sends and receives raw CAN frames  | Provided by can-lite; constructed before the category objects          |
+| FOC motor category server  | Decodes the category's commands    | Provided by e-foc-protocol; the CAN bridge is its only observer        |
 | Control-mode state machine | Accepts motor control commands     | Every command is synchronous or delivers its result through a callback |
-| CAN bus driver             | Raw CAN bus access                 | Required by the CAN protocol server and the CAN protocol client       |
-| Tracer                     | Diagnostic output                  | Outlives the tracing decorators                                       |
-| Current stream ring        | Windows filled by the control loop | Single producer (control interrupt), single consumer (event loop)     |
+| CAN bus driver             | Raw CAN bus access                 | Required by the CAN protocol server and the CAN protocol client        |
+| Tracer                     | Diagnostic output                  | Outlives the tracing decorators                                        |
+| Current stream ring        | Windows filled by the control loop | Single producer (control interrupt), single consumer (event loop)      |
 
 ---
 
@@ -486,17 +489,17 @@ graph LR
 
 ## Constraints & Limitations
 
-| Constraint              | Value / Description                                                                                                                |
-|-------------------------|------------------------------------------------------------------------------------------------------------------------------------|
-| No heap                 | All objects are value members or statically allocated; callbacks need no heap                                                      |
-| One observer per server | A category server holds one observer: only one bridge attaches at a time                                                           |
-| Setpoint range          | Torque: bounded by the inverter's maximum supported current; speed: 1000 rad/s; position: ±2000π rad, 1000 turns (contract 4.0)    |
-| Sequence byte           | Server handlers always skip the first byte (sequence number) before reading payload fields                                         |
-| Ident re-entrancy       | A second identification command while one is in flight returns *busy* as a category error                                         |
-| NVM re-entrancy         | A second config-persist command while one is in flight returns *busy* as a category error                                          |
-| Parameter writes        | One outstanding per node; acknowledged after the value is in force and stored                                                      |
-| Setting changes         | Refused unless stopped (start-up settings excepted); a loop's settings only while its mode runs that loop                          |
-| Telemetry speed/pos     | Speed is the active mode's measured speed, zero while disabled; position is the position tracker's multi-turn position (4.0)       |
-| Current stream          | 0–1000 Hz per node, window mean of Id and Iq; the sum over all nodes of rate × 150 bit stays within 70 % of the bitrate (Part J)   |
-| Node ID                 | Configured base + board ID, fixed at boot; 1–4095                                                                                  |
-| Firmware download       | Configuration writes answered *busy*, the drive held stopped, while a pack is received (Part K)                                    |
+| Constraint              | Value / Description                                                                                                              |
+|-------------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| No heap                 | All objects are value members or statically allocated; callbacks need no heap                                                    |
+| One observer per server | A category server holds one observer: only one bridge attaches at a time                                                         |
+| Setpoint range          | Torque: bounded by the inverter's maximum supported current; speed: 1000 rad/s; position: ±2000π rad, 1000 turns (contract 4.0)  |
+| Sequence byte           | Server handlers always skip the first byte (sequence number) before reading payload fields                                       |
+| Ident re-entrancy       | A second identification command while one is in flight returns *busy* as a category error                                        |
+| NVM re-entrancy         | A second config-persist command while one is in flight returns *busy* as a category error                                        |
+| Parameter writes        | One outstanding per node; acknowledged after the value is in force and stored                                                    |
+| Setting changes         | Refused unless stopped (start-up settings excepted); a loop's settings only while its mode runs that loop                        |
+| Telemetry speed/pos     | Speed is the active mode's measured speed, zero while disabled; position is the position tracker's multi-turn position (4.0)     |
+| Current stream          | 0–1000 Hz per node, window mean of Id and Iq; the sum over all nodes of rate × 150 bit stays within 70 % of the bitrate (Part J) |
+| Node ID                 | Configured base + board ID, fixed at boot; 1–4095                                                                                |
+| Firmware download       | Configuration writes answered *busy*, the drive held stopped, while a pack is received (Part K)                                  |

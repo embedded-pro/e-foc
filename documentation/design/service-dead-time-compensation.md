@@ -28,12 +28,12 @@ date: 2026-11-26
 
 ## Responsibilities
 
-A leg of the bridge does not deliver its duty. Between one switch turning off and the other turning
-on, the phase current alone decides where the switch node goes, and the leg loses voltage against
-the current's sign ([software-in-the-loop](../verification_and_validation/software-in-the-loop.md), Part L). On the reference board the
-loss is about 0.2 % of the period once the current passes about 0.2 A, and below that it shrinks in
-proportion to the current. At small currents the winding therefore sees about 0.17 Ω more than it
-has, which is why the online resistance estimate reads about 20 % high on the rig.
+A leg of the bridge does not deliver its duty. Between one switch turning off and the other turning on, the
+phase current alone decides where the switch node goes. The leg loses voltage against the current's sign
+([software-in-the-loop](../verification_and_validation/software-in-the-loop.md), Part L). On the reference
+board the loss is about 0.2 % of the period once the current passes about 0.2 A. Below that it shrinks in
+proportion to the current. At small currents the winding therefore sees about 0.17 Ω more than it has. This is
+why the online resistance estimate reads about 20 % high on the rig.
 
 **Is responsible for:**
 - Correcting every duty the drive commands by the loss its leg's current will cause
@@ -46,34 +46,33 @@ has, which is why the online resistance estimate reads about 20 % high on the ri
 
 ### Part A — Where the correction sits
 
-The correction lives in the inverter compensation stage, which stands between the platform's
-inverter and everything that commands duties or reads currents: the current loop and the
-identification and alignment procedures. To them it is the inverter. On the way in it removes the
-sensors' offsets from each sample ([service-current-offsets.md](service-current-offsets.md)) and remembers the result; on the
-way out it corrects the next duty with those currents. In the closed loop the duty follows the
-sample it was computed from in the same interrupt, so the correction always uses the current of
-that period. It also hands the offsets it removes down to the platform: a
-low-side shunt board rebuilds a hidden phase from the other two raw samples, and that phase must
-carry the sum of the three offsets for the subtraction here to leave it unbiased
-([low-side current sensing](../theory/low-side-current-sensing.md) §4).
+The correction lives in the inverter compensation stage. This stage stands between the platform's inverter and everything
+that commands duties or reads currents: the current loop and the identification and alignment procedures. To them it is the
+inverter. On the way in it removes the sensors' offsets from each sample
+([service-current-offsets.md](service-current-offsets.md)) and remembers the result. On the way out it corrects the next duty
+with those currents. In the closed loop the duty follows the sample it was computed from in the same interrupt. The
+correction therefore always uses the current of that period. It also hands the offsets it removes down to the platform. A
+low-side shunt board rebuilds a hidden phase from the other two raw samples. That phase must carry the sum of the three
+offsets for the subtraction here to leave it unbiased ([low-side current sensing](../theory/low-side-current-sensing.md) §4).
 
 Both corrections share the stage so that a sample and a duty each cross one call, not two. They
 used to be two stages, one wrapping the other, and each passed the other's traffic through.
 
 A board that states no loss, or a dead band other than the one its loss was measured at, would get
 every duty back unchanged. The stage then hands its duties to the platform as they are, without the
-arithmetic, which keeps the correction's cost out of the 20 kHz path on those boards.
+arithmetic. This keeps the correction's cost out of the 20 kHz path on those boards.
 
-The voltage the current loop asks for is unchanged. The anti-windup limits and the online
-estimators see that voltage, and the correction makes the winding receive it, which is why the
-online resistance estimate then measures the winding alone. The platform's rule that keeps the
-low-side shunts readable shifts all three corrected duties together, after the correction.
+The voltage the current loop asks for is unchanged. The anti-windup limits and the online estimators
+see that voltage, and the correction makes the winding receive it. This is why the online resistance
+estimate then measures the winding alone. The platform's rule that keeps the low-side shunts
+readable shifts all three corrected duties together, after the correction.
 
 ### Part B — The correction
 
-For each leg, the duty moves by the effective dead time over the PWM period, times the leg's
-current over the knee current held between minus one and one. A current flowing out of the leg
-raises its duty, one flowing in lowers it. The result is held between 0 and 100 %.
+For each leg, the duty moves by the effective dead time over the PWM period, times a current ratio.
+This ratio is the leg's current over the knee current, held between minus one and one. A current
+flowing out of the leg raises its duty, one flowing in lowers it. The result is held between 0 and
+100 %.
 
 The loss is a fixed time out of every period, so its share of the duty scales with the PWM
 frequency. The service takes that frequency from the inverter's PWM frequency, not from the sample
@@ -99,16 +98,17 @@ ones the offset correction needs anyway.
 A board with no figure for the dead band it runs reports none, and its duties pass unchanged.
 
 The reference board's figure comes from a sweep on the rig at 24 V. One leg was stepped from 50 % in
-single PWM counts, from 1 to 150 of 1500, in both directions, with the other two legs at 50 %. Each
-point averaged 8000 offset-corrected samples, and the rotor did not move. Through the 500 ns band
-the winding read 1.02 to 1.06 Ω above 1 A. The saturated loss was 0.12 to 0.16 % of the period,
+single PWM counts, from 1 to 150 of 1500, in both directions. The other two legs stayed at 50 %.
+Each point averaged 8000 offset-corrected samples, and the rotor did not move. Through the 500 ns
+band the winding read 1.02 to 1.06 Ω above 1 A. The saturated loss was 0.12 to 0.16 % of the period,
 and the knee was 0.18 to 0.21 A. The spread in each comes from the bus reading, which fell by up to
 0.4 V at 1.5 A. The figure takes the middle of each.
 
-Widening the band to 1000, 1500 and 2000 ns moved the saturated loss up in 500 ns steps, each about
-420 ns short of the band: the gate driver's and the switches' delays take that much back. The
-same delays leave the true gap between one switch turning off and the other turning on much
-shorter than the band, so the band should not be narrowed without measuring that gap on a scope.
+Widening the band to 1000, 1500 and 2000 ns moved the saturated loss up in 500 ns steps. Each loss
+was about 420 ns short of the band: the gate driver's and the switches' delays take that much back.
+The same delays leave the true gap between one switch turning off and the other turning on much
+shorter than the band. The band should therefore not be narrowed without measuring that gap on a
+scope.
 
 ### Part D — Where it does not reach
 
@@ -119,9 +119,9 @@ shorter than the band, so the band should not be narrowed without measuring that
   moves it by up to the full loss. Space-vector modulation keeps the legs off the rails except at
   full modulation, where the effect is a fraction of a percent.
 
-A consumer may sample below the PWM rate: the PWM keeps its own frequency, the shared [decimating
-inverter](platform-phase-current-rate.md) hands on every Nth sample, and the correction is scaled
-for the PWM's own period, not for the rate the consumer asked for.
+A consumer may sample below the PWM rate. The PWM keeps its own frequency, and the shared
+[decimating inverter](platform-phase-current-rate.md) hands on every Nth sample. The correction is
+scaled for the PWM's own period, not for the rate the consumer asked for.
 
 ---
 
@@ -163,22 +163,28 @@ sequenceDiagram
 
 ## Verification
 
-The unit tests check the direction and size of the correction past the knee, the ramp below it,
-the scaling with the PWM frequency, the bounds at 0 and 100 %, and that a board with no loss gets
-its duties unchanged. Through a stage that loses the dead time at 2 A, the corrected leg delivers
-the commanded voltage to within 1 mV.
+The unit tests check:
 
-Through the bench's power stage, uncompensated, the online resistance reads 18.1 to 18.3 % above
-the winding, and compensated with the board's figure it reads 3.2 to 3.3 % above
-(REQ-CTL-001, identification robustness scenarios).
+- the direction and size of the correction past the knee
+- the ramp below it
+- the scaling with the PWM frequency
+- the bounds at 0 and 100 %
+- that a board with no loss gets its duties unchanged.
+
+Through a stage that loses the dead time at 2 A, the corrected leg delivers the commanded voltage to
+within 1 mV.
+
+Through the bench's power stage, uncompensated, the online resistance reads 18.1 to 18.3 % above the
+winding. Compensated with the board's figure, it reads 3.2 to 3.3 % above (REQ-CTL-001,
+identification robustness scenarios).
 
 Through the same stage the calibration resistance reads 4.4 % above the winding uncompensated and
 2.4 % above compensated (REQ-CMS-001). Held at 1 % legs and written once, it read 4.2 % and 4.5 %:
 the correction did not reach it. What stays is the switches' on-resistance, 1.1 % of the bench
-winding, which the current also crosses in closed loop, and the difference between the plant's
-100 ns and the board's 70 ns.
+winding, which the current also crosses in closed loop. The difference between the plant's 100 ns
+and the board's 70 ns also stays.
 
-On the rig the correction moves the calibration resistance by less than the runs scatter: three
+On the rig the correction moves the calibration resistance by less than the runs scatter. Three
 interleaved pairs read 1.082 Ω held at 1 % legs and 1.083 Ω held near mid-rail and corrected, each
-within 0.005 Ω, against an online resistance of 1.077 to 1.079 Ω. At 2 A the board's 70 ns is
-worth at most about 0.03 Ω on this step.
+within 0.005 Ω. This compares with an online resistance of 1.077 to 1.079 Ω. At 2 A the board's 70
+ns is worth at most about 0.03 Ω on this step.

@@ -34,9 +34,9 @@ date: 2026-11-26
 - Reporting a value only when the measurement is precise and spans enough speed, and reporting a
   runaway as a failure in its own right.
 
-The flux linkage cannot come from the mechanical identification: that service turns current into
-torque through $K_t = \tfrac{3}{2} p \psi_f$ and fits inertia and friction to the motion, and from speed
-and current alone a larger $\psi_f$ only scales the inertia and friction it reports. A voltage has to be
+The flux linkage cannot come from the mechanical identification. That service turns current into torque
+through $K_t = \tfrac{3}{2} p \psi_f$ and fits inertia and friction to the motion. From speed and
+current alone, a larger $\psi_f$ only scales the inertia and friction it reports. A voltage has to be
 measured.
 
 ---
@@ -51,16 +51,16 @@ $$
 v_q = R_s i_q + L_s \frac{di_q}{dt} + \omega_e L_s i_d + \omega_e \psi_f \;\approx\; \omega_e \psi_f
 $$
 
-The service spins the rotor up with a small q-axis current, sets the current to zero and, while the
-rotor coasts, records the q-axis voltage the current loop applies against the electrical speed. The
-flux linkage is the slope of a straight-line fit. The fit's intercept absorbs a constant voltage
-error, such as what is left of the dead time, and $R_s i_q$ is subtracted from each point so that a
-current law that does not hold exactly zero still measures the back-EMF. Neither the resistance nor
-the inductance needs to be exact, since the current they multiply is close to zero.
+The service spins the rotor up with a small q-axis current and sets the current to zero. While the
+rotor coasts, it records the q-axis voltage the current loop applies against the electrical speed.
+The flux linkage is the slope of a straight-line fit. The fit's intercept absorbs a constant voltage
+error, such as what is left of the dead time. The service subtracts $R_s i_q$ from each point, so
+that a current law that does not hold exactly zero still measures the back-EMF. Neither the
+resistance nor the inductance needs to be exact, since the current they multiply is close to zero.
 
 Each fitted point is the mean of 10 ms of observations. A single 1 ms speed reading on a 1000-count
-encoder carries a count of quantisation, a quarter of the speed at 25 rad/s, and noise in the speed
-pulls a least-squares slope towards zero: with 1 ms points the bench motor's inertia came out 7.9 %
+encoder carries a count of quantisation, a quarter of the speed at 25 rad/s. Noise in the speed
+pulls a least-squares slope towards zero. With 1 ms points, the bench motor's inertia came out 7.9 %
 low through the flux linkage. The 10 ms mean leaves a tenth of that noise.
 
 ### Part B — The spin profile
@@ -90,32 +90,37 @@ stateDiagram-v2
 | Run limit              | 5 s                                           | A rotor that never reaches the release speed is not identified     |
 
 Under the sliding-mode law the rotor barely slows at a 0 A setpoint, since the law leaves a small
-current: in simulation it was still above 27 rad/s after 1.5 s. Braking it to 15 rad/s and recording
+current. In simulation it was still above 27 rad/s after 1.5 s. Braking it to 15 rad/s and recording
 again gives the fit its span.
 
 The current the law leaves comes from the back-EMF feedforward, which uses the flux linkage being
-measured. When that is too large the current drives the rotor, and with the noise-bound automatic
-bandwidth the bench motor speeds up at 0 A instead of coasting. A 10 ms point whose mean speed is
-above the recording ceiling and higher than the point before ends the coast; the rotor is slowed to
-15 rad/s and recorded again as it speeds up. The fit subtracts $R_s i_q$ with the measured current, so
-the current it leaves does not bias the slope. The overshoot past the release speed falls from one
-point to the next, so it does not end a coast.
+measured. When that is too large, the current drives the rotor. With the noise-bound automatic
+bandwidth, the bench motor then speeds up at 0 A instead of coasting. A 10 ms point whose mean speed
+is above the recording ceiling and higher than the point before ends the coast. The rotor is then
+slowed to 15 rad/s and recorded again as it speeds up. The fit subtracts $R_s i_q$ with the measured
+current, so the current it leaves does not bias the slope. The overshoot past the release speed falls
+from one point to the next, so it does not end a coast.
 
 The release happens ahead of the release speed by twice the speed gained over the last tick. The
-measured speed is a 1 ms mean, a period behind the rotor, and the current falls to zero a period
-after it is set, so a rotor gaining speed fast is already well past the speed it is released at. In
-simulation the low-inertia reference motor gained 4 rad/s per tick on the spin current: released when
+measured speed is a 1 ms mean, a period behind the rotor. The current falls to zero a period after it
+is set. A rotor gaining speed fast is therefore already well past the speed it is released at. In
+simulation the low-inertia reference motor gained 4 rad/s per tick on the spin current. Released when
 its measured speed passed 40 rad/s, it was at 47 rad/s and peaked at 50.4 rad/s, an overspeed. Counting
 two ticks of gain releases it below 40 rad/s, and it peaks below 45 rad/s. The bench motor gains about
-1 rad/s per tick and its 1000-count encoder reads the speed in steps of 1.6 rad/s, so it is released a
-few rad/s earlier than before; the coast still spans more than three to one.
+1 rad/s per tick, and its 1000-count encoder reads the speed in steps of 1.6 rad/s. It is therefore
+released a few rad/s earlier than before. The coast still spans more than three to one.
 
 ### Part C — Accepting the result
 
-A result is reported as identified only when the fit has at least 10 points, its lowest speed is at
-most half its highest, the slope's relative standard error is at most 5 %, the intercept is at most
-15 % of the largest voltage recorded, and the slope lies inside the flux-linkage range a motor
-parameter may take. Otherwise the result is not identified, and the calibration keeps the value it
+A result is reported as identified only when:
+
+- the fit has at least 10 points
+- its lowest speed is at most half its highest
+- the slope's relative standard error is at most 5 %
+- the intercept is at most 15 % of the largest voltage recorded
+- the slope lies inside the flux-linkage range a motor parameter may take.
+
+Otherwise the result is not identified, and the calibration keeps the value it
 had. A speed above the limit at any point is reported as an overspeed, which fails the calibration.
 
 ---
@@ -167,17 +172,18 @@ sequenceDiagram
 
 ## Verification
 
-Unit tests drive the service against a simulated rotor and check the fitted flux linkage for a
-coasting rotor, a constant voltage offset, a rotor that barely slows, and a rotor the current law
-keeps driving at 0 A. They also check braking to rest, the current limit, an overspeed, a rotor that
-never reaches the release speed, an abort and a refused request. Rotors gaining 3.9 to 5.4 rad/s per
-tick, seen a period late, are released early enough to peak below 45 rad/s; released at the measured
-40 rad/s they reached 54 rad/s and were reported as an overspeed.
+Unit tests drive the service against a simulated rotor and check the fitted flux linkage in four
+cases. These are a coasting rotor, a constant voltage offset, a rotor that barely slows, and a rotor
+the current law keeps driving at 0 A. They also check braking to rest, the current limit, an
+overspeed, a rotor that never reaches the release speed, an abort and a refused request. Rotors
+gaining 3.9 to 5.4 rad/s per tick, seen a period late, are released early enough to peak below 45
+rad/s. Released at the measured 40 rad/s, they reached 54 rad/s and were reported as an overspeed.
 
-In the model-in-the-loop, calibrating against plants whose flux linkage differs from the configured
-7.0 mWb, the stored flux linkage is within 0.2 % of 4.6 mWb on the bench motor and within 0.1 % on
-both reference motors, in torque and in speed mode. With the bench's 38.5 mA of current noise and each
-duty a period late, it is within 1 % under every current law, at the noise-bound automatic bandwidth.
+In the model-in-the-loop, the calibration runs against plants whose flux linkage differs from the
+configured 7.0 mWb. The stored flux linkage is within 0.2 % of 4.6 mWb on the bench motor. It is
+within 0.1 % on both reference motors, in torque and in speed mode. With the bench's 38.5 mA of
+current noise and each duty a period late, it is within 1 % under every current law. This holds at the
+noise-bound automatic bandwidth.
 The mechanical identification that follows reads the inertia within 0.1 % on a 1000-count encoder
 (REQ-CMS-001, parameter identification scenarios).
 

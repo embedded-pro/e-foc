@@ -71,13 +71,13 @@ application target name, as [bootloader.md](bootloader.md) requires.
 ### Part A — download and apply
 
 The service follows the state machine of the can-lite firmware-upgrade specification (section 7.6), with one
-difference: a verified pack is kept instead of being forgotten when the session ends. The category server stops
-its session timer on Verify and on Activate, also when it refuses them, so the service keeps its own inactivity
-deadline while a pack is received: 30 s after Begin was answered or the last command it accepted, after which
-the download ends as on Abort. The category server's own session timer, which it starts on an accepted Begin
-and restarts on every acknowledged block, runs beside it with the same length and reaches the same end: its
-expiry is handled exactly as the service's deadline, so whichever fires first ends the download and the other
-finds nothing to end. The emergency stop ends a download the same way (Part F). After a successful Verify no
+difference. A verified pack is kept instead of being forgotten when the session ends. The category server stops
+its session timer on Verify and on Activate, also when it refuses them. The service therefore keeps its own
+inactivity deadline while a pack is received. The deadline is 30 s after Begin was answered or the last command it
+accepted. After it, the download ends as on Abort. The category server's own session timer runs beside it with the
+same length and reaches the same end. The server starts it on an accepted Begin and restarts it on every
+acknowledged block. Its expiry is handled exactly as the service's deadline. Whichever fires first ends the
+download, and the other finds nothing to end. The emergency stop ends a download the same way (Part F). After a successful Verify no
 deadline runs, so Activate may come at any later time, also after a restart.
 
 | State      | Meaning                                                                        | Drive and NVM interlock (Part G) |
@@ -91,8 +91,8 @@ deadline runs, so Activate may come at any later time, also after a restart.
 | Restarting | Activate accepted; the reset follows within one second                         | held                             |
 
 At start-up the service reads the status journal. A journal that reads *downloaded* puts it in Staged, with
-the pack's version and size read from its header (Part H), so Query Progress reports the whole pack received;
-any other status puts it in Idle. The journal is the
+the pack's version and size read from its header (Part H). Query Progress then reports the whole pack received.
+Any other status puts it in Idle. The journal is the
 bootloader's own ([bootloader.md](bootloader.md) Part B), read and written through the same library component, so both read
 the same entries.
 
@@ -104,22 +104,22 @@ erased:
 | Condition                                                                           | Otherwise     |
 |-------------------------------------------------------------------------------------|---------------|
 | No pack is being erased for or received                                             | *Busy*        |
-| The drive is stopped: Idle or Ready; never Enabled, Calibrating or Fault  | *Busy*        |
+| The drive is stopped: Idle or Ready; never Enabled, Calibrating or Fault            | *Busy*        |
 | No asynchronous work is outstanding: no command pending, no NVM operation in flight | *Busy*        |
 | The size is at least one pack header and at most the staging slot, 320 KB           | *InvalidSize* |
 | The board has a staging slot                                                        | *InvalidSize* |
 
 *Busy* covers the drive's state as well as a transfer in progress, as the *busy* category error does for the
-FOC motor commands; a client tells them apart from the status it last read. A drive in Fault is not
+FOC motor commands. A client tells them apart from the status it last read. A drive in Fault is not
 stopped in this sense: the fault is cleared first, so a download never starts while a fault is unexplained.
 
-An accepted Begin erases the status journal, which discards a pack that was staged before, then the entire
-staging slot, one sector per event-loop turn, and only then answers. Each sector is read back after its erase,
-a chunk per turn, and a byte that does not read erased ends the download: the flash drivers report no error of
+An accepted Begin first erases the status journal, which discards a pack that was staged before. It then erases
+the entire staging slot, one sector per event-loop turn, and only then answers. Each sector is read back after its
+erase, a chunk per turn. A byte that does not read erased ends the download. The flash drivers report no error of
 their own, so the read-back is how the service sees a failed erase. The download therefore starts on a slot
 that is known to be erased: 16 sectors on the reference board, whatever the pack's size. The answer carries the
-page size, the number of bytes the service collects before it programs them: 128 on the reference board and 256 on
-the emulated board (Part I).
+page size, the number of bytes the service collects before it programs them. The page size is 128 on the reference board
+and 256 on the emulated board (Part I).
 
 - An erase that fails, or a sector that does not read back erased, is answered *WriteError*, and the session
   goes to Error.
@@ -131,34 +131,38 @@ the emulated board (Part I).
 ### Part C — data blocks
 
 - Blocks arrive in ascending order from 0, six bytes each (fewer in the last). The block the service expects
-  next is written; a repeat of the block it acknowledged last is acknowledged again without being written,
-  because only its acknowledgement was lost; any other index is answered *SequenceError* with nothing written.
+  next is written. A repeat of the block it acknowledged last is acknowledged again without being written,
+  because only its acknowledgement was lost. Any other index is answered *SequenceError* with nothing written.
 - The bytes are collected into one page. A full page is programmed into the staging slot, which Begin
-  erased, and read back and compared with what was sent before its last block is acknowledged; nothing is
+  erased. It is then read back and compared with what was sent before its last block is acknowledged. Nothing is
   erased while blocks arrive, so each block costs at most one page program and one read (Part G).
 - A page that does not read back as programmed is answered *WriteError* and the session goes to Error; the
   client starts the download again with Begin. The page is not written a second time, because some internal
-  flash cannot program a unit twice without erasing it, and a second Begin erases the staging slot again.
+  flash cannot program a unit twice without erasing it. A second Begin erases the staging slot again.
 - A block that would take the download past the size given in Begin is answered *InvalidSize*.
 - A block that fills a page is acknowledged once the page is programmed. A command that arrives while a page
   is programmed is answered *Busy*, except Abort, which waits for it (Part F).
 
 ### Part D — Verify: the end of the download
 
-Verify is answered *InvalidState* unless a pack is being received, and *InvalidSize* until every byte of the
-size given in Begin has arrived; the download stays open after either. Otherwise Verify first programs the
+Verify is answered *InvalidState* unless a pack is being received. It is answered *InvalidSize* until every byte
+of the size given in Begin has arrived. The download stays open after either. Otherwise Verify first programs the
 last, partly filled page, then reads the pack back from the staging slot, a chunk per event-loop turn, and
 checks:
 
 1. the CRC-32 of exactly the Begin size, in the variant the can-lite specification fixes (section 4.3),
    against the value Verify carries; otherwise *CrcMismatch*;
-2. the pack header, as far as it can be read without the key: the magic, header version 1, a product name
-   equal to this firmware's own, which names the board and its processor part ([bootloader.md](bootloader.md) Part B),
-   a product version of three decimal numbers from 0 to 255, major, minor and patch, separated by dots
-   (Part H), and one image whose target is the application, which ends the pack, and whose length, less its
-   image header and its AES counter, fits the application slot less its descriptor; otherwise *NotReady*, the
-   specification's answer for "no application". The image's destination and exact size are encrypted; the
-   bootloader checks them before it erases anything ([bootloader.md](bootloader.md) Parts C and I).
+2. the pack header, as far as it can be read without the key; otherwise *NotReady*, the specification's answer
+   for "no application". The header is checked for:
+   - the magic and header version 1
+   - a product name equal to this firmware's own, which names the board and its processor part
+     ([bootloader.md](bootloader.md) Part B)
+   - a product version of three decimal numbers from 0 to 255, major, minor and patch, separated by dots (Part H)
+   - one image whose target is the application, which ends the pack, and whose length, less its image header and
+     its AES counter, fits the application slot less its descriptor
+
+The image's destination and exact size are encrypted. The bootloader checks them before it erases anything
+([bootloader.md](bootloader.md) Parts C and I).
 
 A pack built for another board names another part
 and fails the second check; the bootloader would refuse it again ([bootloader.md](bootloader.md) Part I). The signature is
@@ -171,15 +175,15 @@ fails leaves the session in Error with the journal empty, so nothing is staged a
 
 Activate is accepted only when all of these hold:
 
-| Condition                               | Otherwise  |
-|-----------------------------------------|------------|
-| A checked pack is staged (Staged)       | *NotReady* |
+| Condition                           | Otherwise  |
+|-------------------------------------|------------|
+| A checked pack is staged (Staged)   | *NotReady* |
 | The drive is stopped: Idle or Ready | *Busy*     |
-| No asynchronous work is outstanding     | *Busy*     |
+| No asynchronous work is outstanding | *Busy*     |
 
-The service then writes *ready to deploy* into the status journal, enters Restarting, answers, and restarts the
-controller 250 ms later, which leaves the acknowledgement time to leave the send queue, through the
-platform's software reset. On the emulated board the software reset requests a system reset, and the
+The service then writes *ready to deploy* into the status journal, enters Restarting and answers. It restarts the
+controller 250 ms later through the platform's software reset. The delay leaves the acknowledgement time to leave
+the send queue. On the emulated board the software reset requests a system reset, and the
 emulator restarts into the bootloader, as the board does. Restarting holds the same interlocks as receiving a pack (Part G). Thus nothing starts the drive
 or writes the non-volatile memory in that second, and a new Begin is answered *Busy*.
 The bootloader installs the pack at that reset, and the new application starts. Between the download and the
@@ -199,7 +203,7 @@ them as the NVM design describes ([service-nvm.md](service-nvm.md), version chec
   next block answered *InvalidState*. A staged pack stays staged, and an accepted Activate still restarts.
 - Abort in Staged or Error discards the staged pack and the service returns to Idle. The pack is unavailable at
   once: Activate is answered *NotReady* and the staged version reads zero. Erasing the journal stalls flash, so
-  it is carried out only while the drive is stopped (Idle or Ready) with nothing outstanding; an Abort that
+  it is carried out only while the drive is stopped (Idle or Ready) with nothing outstanding. An Abort that
   arrives while the drive runs leaves the erase until it is next stopped and idle. A restart before then leaves
   the pack staged.
 - A sector being erased or a page being programmed finishes first.
@@ -209,41 +213,44 @@ them as the NVM design describes ([service-nvm.md](service-nvm.md), version chec
 - **Drive.** While a pack is received (Erasing, Receiving and Verifying), and after an accepted Activate
   (Restarting), the service counts as asynchronous work of the control-mode state machine. Thus the state
   machine refuses enable, calibration, re-alignment, calibration clear, a motor parameter change and a
-  control-mode or algorithm selection, as they are while an NVM write is outstanding
-  ([state-machine.md](state-machine.md)). A staged pack holds nothing: the drive runs normally until the user applies it, and
-  Activate is admitted only once it is stopped again (Part E). The emergency stop is always accepted, and ends
+  control-mode or algorithm selection. It refuses them as it does while an NVM write is outstanding
+  ([state-machine.md](state-machine.md)). A staged pack holds nothing. The drive runs normally until the user applies
+  it, and Activate is admitted only once it is stopped again (Part E). The emergency stop is always accepted, and ends
   a download in progress (Part F).
 - **Non-volatile memory.** While a pack is received, and while Restarting, the CAN bridge answers *busy* to every
   command that writes
   the configuration record: start-up settings, telemetry rate and fault supervision settings. Where the
   EEPROM and the flash share one controller, as on the reference board, a flash program and an EEPROM write must
-  never overlap; elsewhere the rule costs nothing and keeps the behaviour the same.
-- **Watchdog.** A sector erase stalls every read of the flash half being erased until it completes, on the reference
-  board the instruction fetches and the watchdog's early-warning handler included, and the hardware resets
+  never overlap. Elsewhere the rule costs nothing and keeps the behaviour the same.
+- **Watchdog.** A sector erase stalls every read of the flash half being erased until it completes. On the reference
+  board, this includes the instruction fetches and the watchdog's early-warning handler. The hardware resets
   25 ms after a warning its handler has not cleared. A 16 KB erase takes about 17 ms on the bench and up to
-  40 ms with wear, so an erase in the half the application executes from cannot be made safe by splitting
-  it. The staging slot and the journal therefore lie entirely in the other half ([bootloader.md](bootloader.md) Part A),
-  where their erases run while the core keeps executing. The service erases one sector per event-loop turn
-  and programs one page at a time, so the watchdog's own 100 ms expiry is never approached. Those turns
-  follow each other with nothing else scheduled between them, so from an accepted Begin to its answer the
-  node sends nothing, its heartbeat included: 0.68 s on the reference board for the 21 sectors with their
-  read-back. The design bounds that silence at 1 s, one heartbeat interval and a third of the 3 s after
-  which a client reports the node offline, and the hardware apply scenario's `[METRIC]` line, Begin to
-  answer, measures it.
+  40 ms with wear. An erase in the half the application executes from therefore cannot be made safe by splitting
+  it. For this reason, the staging slot and the journal lie entirely in the other half
+  ([bootloader.md](bootloader.md) Part A). Their erases run there while the core keeps executing. The service erases
+  one sector per event-loop turn and programs one page at a time. The watchdog's own 100 ms expiry is therefore
+  never approached. Those turns follow each other with nothing else scheduled between them. From an accepted Begin to its
+  answer, the node therefore sends nothing, its heartbeat included. This silence lasts 0.68 s on the reference
+  board for the 21 sectors with their read-back. The design bounds that silence at 1 s. This is one heartbeat interval
+  and a third of the 3 s after which a client reports the node offline. The hardware apply scenario's `[METRIC]` line,
+  Begin to answer, measures it.
 - **Real time.** The drive is stopped while a pack is received, so no power-stage output depends on the control interrupt
   during a stall. No code is added to the control interrupt or the outer loop.
 
 ### Part H — firmware identity (contract 2.6)
 
 Contract 2.6 adds read-only parameters to the FOC motor contract (the e-foc-protocol wire contract, Part A, "Contract 2.6"):
-the major, minor and patch numbers of the running firmware's release version, the board kind, and the version
-of the staged pack, zero when none is staged. The running version is the one the build stamps into the
-application header ([bootloader.md](bootloader.md) Part B), the project's release version; the staged version is the product
-version in the staged pack's header, which Verify requires to read as three numbers from 0 to 255, the range
-the parameters carry (Part D). Every board reports its version and its kind, also one that cannot be updated.
-A board kind maps to the
-board its packs name ([bootloader.md](bootloader.md) Part B), so a client picks the pack for the board it
-talks to and shows what waits to be applied.
+
+- the major, minor and patch numbers of the running firmware's release version
+- the board kind
+- the version of the staged pack, zero when none is staged
+
+The running version is the one the build stamps into the application header ([bootloader.md](bootloader.md) Part B),
+the project's release version. The staged version is the product version in the staged pack's header. Verify
+requires it to read as three numbers from 0 to 255, the range the parameters carry (Part D). Every board reports
+its version and its kind, also one that cannot be updated. A board kind maps to the board its packs name
+([bootloader.md](bootloader.md) Part B). A client thus picks the pack for the board it talks to and shows what waits
+to be applied.
 
 The firmware answers the running version and the board kind (0xB1–0xB4) from two sources. The version comes
 from the version information EmIL generates from the project version. The board kind comes from the platform,
@@ -254,26 +261,30 @@ a board whose support was dropped, and is never reused.
 
 ### Part I — per board
 
-| Board                        | Staging flash                                     | Page  | Pack capacity |
-|------------------------------|---------------------------------------------------|-------|---------------|
+| Board                        | Staging flash                                                    | Page  | Pack capacity |
+|------------------------------|------------------------------------------------------------------|-------|---------------|
 | Reference board              | internal flash, staging region of [bootloader.md](bootloader.md) | 128 B | 327 680 B     |
-| Emulated                     | a staging file in the scenario directory          | 256 B | 327 680 B     |
-| Board with no bootloader yet | none until it has a bootloader                    | —     | 0             |
+| Emulated                     | a staging file in the scenario directory                         | 256 B | 327 680 B     |
+| Board with no bootloader yet | none until it has a bootloader                                   | —     | 0             |
 
 A board without a staging slot still answers the category: Begin with *InvalidSize*, Verify with
 *InvalidState*, Activate with *NotReady*.
 
-The platform provides the staging flash and the status journal, the board identification its packs carry as
-product name ([bootloader.md](bootloader.md) Part B), the application slot's capacity and the page size; the service depends
-on these abstractions only. Whether a board has staging follows from its bootloader layout, not from its
-identification, which every board has: a board whose layout places no staging slot provides none. On the
-emulated target a staging file and a journal file stand in for the staging flash and the journal as the
-EEPROM file stands in for the NVM, so a scenario can read back what the firmware staged; they are the files the
-emulated bootloader reads ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md) Part P).
+The platform provides:
+
+- the staging flash and the status journal
+- the board identification its packs carry as product name ([bootloader.md](bootloader.md) Part B)
+- the application slot's capacity and the page size
+
+The service depends on these abstractions only. Whether a board has staging follows from its bootloader layout,
+not from its identification, which every board has. A board whose layout places no staging slot provides none. On
+the emulated target, a staging file and a journal file stand in for the staging flash and the journal. The EEPROM
+file stands in for the NVM the same way. A scenario can therefore read back what the firmware staged. These are
+the files the emulated bootloader reads ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md) Part P).
 
 ### Part J — release assets
 
-The release workflow builds, signs and encrypts one pack per board that has a bootloader, and puts it in the
+The release workflow builds, signs and encrypts one pack per board that has a bootloader. It puts the pack in the
 board's firmware archive beside the images a debugger programs:
 
 | Asset                                                    | Content                                                                                             |
@@ -287,33 +298,34 @@ debugger programs together. The pack stays a standalone asset because released C
 that name.
 
 The CAN Commander finds a board's pack by these names, so they stay stable. The packer takes the product name,
-the version and the target identity from the build of that board ([bootloader.md](bootloader.md) Parts I and J), never from
-an argument typed for it. Every asset carries the build-provenance attestation the other assets carry, and the
-release fails when a pack or image exceeds its limit, or when a pack's product name or image identity does not
-match the board it is published for. A dry run builds and signs with the development keys, and so does
-continuous integration on every pull request, so the step a release takes is the one every build has taken.
+the version and the target identity from the build of that board ([bootloader.md](bootloader.md) Parts I and J). It never takes
+them from an argument typed for it. Every asset carries the build-provenance attestation the other assets carry.
+The release fails when a pack or image exceeds its limit. It also fails when a pack's product name or image
+identity does not match the board it is published for. A dry run builds and signs with the development keys, and
+so does continuous integration on every pull request. The step a release takes is therefore the one every build
+has taken.
 
 ### Part K — verification
 
-| Level                | What it shows                                                                                                                                                                                                                                                                                                                                          | Requirements                                       |
-|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------|
-| Unit tests           | Admission of Begin and Activate, the whole slot erased before Begin is answered, block order and repeats, pages, CRC and header checks, the staged pack across a restart, Abort, the emergency stop and timeout, against a flash fake                                                                                                                  | REQ-FWU-002, REQ-FWU-003, REQ-FWU-004, REQ-FWU-005 |
-| Library tests        | In embedded-infra-lib, run by that repository: valid pack installs; wrong product, bad signature, wrong target, wrong destination and oversize refused before any erase; interrupted copy resumes; broken slot halts; each journal record takes a fresh programming unit                                                                               | supports REQ-FWU-001, REQ-FWU-002                  |
-| Software in the loop | A dev-signed pack downloaded over CAN and staged; Begin and Activate refused while running; a pack for another board refused; CRC mismatch; Abort; the emergency stop; NVM writes refused meanwhile; the staged pack kept across a restart; the apply installed by the emulated bootloader                                                             | REQ-FWU-002, REQ-FWU-003, REQ-FWU-005              |
-| Software in the loop | The emulated bootloader's own scenarios: install, interrupted install repeated, a downloaded pack left alone, refusals for a bad signature, another product, another board and another destination, a damaged or empty slot halting it ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md) Part P)                                                                              | REQ-FWU-001, REQ-FWU-002                           |
-| Hardware in the loop | Download, run, stop, apply and restart on the reference board, the version read back (motor hardware-in-the-loop scenarios)                                                                                                                                                                                                                                                    | REQ-FWU-002, REQ-FWU-003                           |
+| Level                | What it shows                                                                                                                                                                                                                                                                                                                                           | Requirements                                       |
+|----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------|
+| Unit tests           | Admission of Begin and Activate, the whole slot erased before Begin is answered, block order and repeats, pages, CRC and header checks, the staged pack across a restart, Abort, the emergency stop and timeout, against a flash fake                                                                                                                   | REQ-FWU-002, REQ-FWU-003, REQ-FWU-004, REQ-FWU-005 |
+| Library tests        | In embedded-infra-lib, run by that repository: valid pack installs; wrong product, bad signature, wrong target, wrong destination and oversize refused before any erase; interrupted copy resumes; broken slot halts; each journal record takes a fresh programming unit                                                                                | supports REQ-FWU-001, REQ-FWU-002                  |
+| Software in the loop | A dev-signed pack downloaded over CAN and staged; Begin and Activate refused while running; a pack for another board refused; CRC mismatch; Abort; the emergency stop; NVM writes refused meanwhile; the staged pack kept across a restart; the apply installed by the emulated bootloader                                                              | REQ-FWU-002, REQ-FWU-003, REQ-FWU-005              |
+| Software in the loop | The emulated bootloader's own scenarios: install, interrupted install repeated, a downloaded pack left alone, refusals for a bad signature, another product, another board and another destination, a damaged or empty slot halting it ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md) Part P)                       | REQ-FWU-001, REQ-FWU-002                           |
+| Hardware in the loop | Download, run, stop, apply and restart on the reference board, the version read back (motor hardware-in-the-loop scenarios)                                                                                                                                                                                                                             | REQ-FWU-002, REQ-FWU-003                           |
 | CAN Commander tests  | Pack checks, the download with lost answers, the separate apply, the restart and version confirmation, against a strict mock bus; the tab's download and apply enabled only for a stopped motor with its identity read, no command pending and no other transfer on the bus, and sent only after the user's confirmation, against the tab's own buttons | REQ-FWU-004                                        |
 
-The hardware scenario downloads the application it runs, as a pack signed with the development key set,
-so the board needs the bootloader with that key set, as every build programmed by a debugger has
+The hardware scenario downloads the application it runs, as a pack signed with the development key set.
+The board therefore needs the bootloader with that key set, as every build programmed by a debugger has
 ([bootloader.md](bootloader.md) Part G). The software-in-the-loop scenarios read the staging and journal files the emulated
 firmware wrote and check the pack and the journal in them. Every scenario that downloads sends a small pack,
-built for the scenario with the real product name. The scenario that applies does not download: the harness
-writes the application itself, as a pack, into the staging file before the target boots, since the bootloader
-checks the image it installs and a full-size download over the emulated serial port would take too long
-([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md) Part Q). The emulator refills the application slot at every reset, so that scenario
-proves the install by the journal reading *deployed* and the heartbeat coming back, not by a changed image; the
-bootloader's own scenarios install into an empty slot ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md) Part P). The new feature goes
+built for the scenario with the real product name. The scenario that applies does not download. The harness
+writes the application itself as a pack into the staging file before the target boots. It does so because the
+bootloader checks the image it installs. Also, a full-size download over the emulated serial port would take too
+long ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md) Part Q). The emulator refills the application slot at every reset. That
+scenario therefore proves the install by the journal reading *deployed* and the heartbeat coming back, not by a
+changed image. The bootloader's own scenarios install into an empty slot ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md) Part P). The new feature goes
 into the shard that keeps the three software-in-the-loop shards balanced.
 
 ---
@@ -324,20 +336,20 @@ into the shard that keeps the three software-in-the-loop shards balanced.
 
 | Interface                        | Purpose                            | Contract                                                                                                                                                                |
 |----------------------------------|------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Firmware-upgrade category server | Download and apply a pack over CAN | can-lite firmware-upgrade specification; answers as Parts B to F                                                                                                      |
+| Firmware-upgrade category server | Download and apply a pack over CAN | can-lite firmware-upgrade specification; answers as Parts B to F                                                                                                        |
 | Running state                    | Interlock with the drive           | True while a pack is received, from an accepted Begin, through the erase, until Verify, Abort or the inactivity deadline, and from an accepted Activate until the reset |
 | Staged version                   | The version waiting to be applied  | The staged pack's product version, zero when none is staged (Part H)                                                                                                    |
 | Emergency stop                   | End a download in progress         | As Abort, without its answer (Part F)                                                                                                                                   |
 
 ### Required
 
-| Interface                  | Purpose                     | Contract                                                                                                                                               |
-|----------------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Staging flash              | Hold the received pack      | Asynchronous flash of the platform; erase per sector, write any byte range                                                                             |
-| Status journal flash       | Record the pack's status    | Synchronous flash of the platform, read and written as the bootloader does                                                                             |
+| Interface                  | Purpose                     | Contract                                                                                                                                           |
+|----------------------------|-----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
+| Staging flash              | Hold the received pack      | Asynchronous flash of the platform; erase per sector, write any byte range                                                                         |
+| Status journal flash       | Record the pack's status    | Synchronous flash of the platform, read and written as the bootloader does                                                                         |
 | Control-mode state machine | Drive state, pending work   | Begin and Activate admitted only in Idle or Ready with nothing outstanding; holds the drive's asynchronous-work interlock for the service (Part G) |
-| Platform software reset    | Restart into the bootloader | Does not return                                                                                                                                        |
-| CAN protocol server        | Category registration       | Registered beside the FOC motor category on the drive's node ([service-can.md](service-can.md) Part K)                                                                 |
+| Platform software reset    | Restart into the bootloader | Does not return                                                                                                                                    |
+| CAN protocol server        | Category registration       | Registered beside the FOC motor category on the drive's node ([service-can.md](service-can.md) Part K)                                             |
 
 ---
 
@@ -431,7 +443,7 @@ sequenceDiagram
 | Constraint          | Value / Description                                                                                                                                  |
 |---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Who starts          | the user, for the download and for the apply, each separately; the service never starts either itself                                                |
-| When                | Begin and Activate only in Idle or Ready with nothing outstanding                                                                                |
+| When                | Begin and Activate only in Idle or Ready with nothing outstanding                                                                                    |
 | Pack size           | at most the staging slot, 320 KB (327 680 bytes), below the 393 216 bytes the transfer can address                                                   |
 | Throughput          | one block in flight; about 2–3 KB/s, so a full 320 KB pack downloads in two to three minutes                                                         |
 | Begin answer        | after the journal and the whole staging slot are erased, a sector per event-loop turn                                                                |

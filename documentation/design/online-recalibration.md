@@ -28,17 +28,20 @@ date: 2026-11-26
 
 ## Responsibilities
 
-In speed and position mode the drive re-estimates its motor while it runs: the resistance and inductance from a
-small d-axis injection ([service-electrical-ident.md](service-electrical-ident.md), Excitation), the inertia and viscous friction from the speed
-and torque current ([service-mechanical-ident.md](service-mechanical-ident.md)). The loop gains are designed from the calibration record, so a
-load whose inertia differs from the commissioned one, or a winding whose resistance has risen, runs on a model that
-no longer matches it. Online recalibration lets the gains follow the estimates, safely (REQ-CMS-003),
-and keeps the inductance, inertia and friction it learned across power cycles (REQ-CMS-003).
+In speed and position mode the drive re-estimates its motor while it runs. It estimates the resistance and
+inductance from a small d-axis injection ([service-electrical-ident.md](service-electrical-ident.md),
+Excitation). It estimates the inertia and viscous friction from the speed and torque current
+([service-mechanical-ident.md](service-mechanical-ident.md)). The loop gains are designed from the calibration
+record. A load whose inertia differs from the commissioned one therefore runs on a model that no longer
+matches it. So does a winding whose resistance has risen. Online recalibration lets the gains follow the
+estimates, safely (REQ-CMS-003), and keeps the inductance, inertia and friction it learned across power cycles
+(REQ-CMS-003).
 
 **Is responsible for:**
-- Deciding when an estimate may replace the model the loops are designed from: once its estimator reports it
-  settled, once it has differed from that model by more than a threshold for a dwell time of running, and only
-  inside a plausibility band around the commissioned value.
+- Deciding when an estimate may replace the model the loops are designed from:
+  - once its estimator reports it settled
+  - once it has differed from that model by more than a threshold for a dwell time of running
+  - and only inside a plausibility band around the commissioned value.
 - Applying the new model only while the drive is stopped, redesigning the current and speed loops from it with the
   loop bandwidths the operator or the calibration chose.
 - The operator's choice of when: never, on command, or on every stop.
@@ -53,11 +56,11 @@ and keeps the inductance, inertia and friction it learned across power cycles (R
 ### Part A — The model in use
 
 The model in use holds the four quantities the loops are designed from: resistance, inductance, inertia and viscous
-friction. At power-up, and whenever the calibration record changes — a calibration, a motor parameter written over
-CAN, a cleared calibration — it is the commissioned model, the record's values, with the stored inductance, inertia
-and friction in place of the record's while the mode is not off (Part F). A recalibration replaces some of its
-quantities; the record does not change. A control-mode switch keeps the model in use: the new mode's loops are
-designed from it once its machine is ready.
+friction. At power-up, and whenever the calibration record changes, it is the commissioned model: the record's
+values. The record changes by a calibration, a motor parameter written over CAN, or a cleared calibration. While
+the mode is not off, the stored inductance, inertia and friction take the place of the record's (Part F). A
+recalibration replaces some of its quantities; the record does not change. A control-mode switch keeps the model in
+use: the new mode's loops are designed from it once its machine is ready.
 
 ### Part B — When an estimate is used
 
@@ -81,9 +84,9 @@ A candidate is applied only inside its plausibility band, a ratio to the commiss
 A candidate outside its band is rejected: it is counted, traced, and the model in use keeps its value. A quantity
 whose commissioned value is not positive — a record without friction — is never recalibrated.
 
-The resistance and inductance bands also gate the one use of an estimate that needs no stop: the sampling-skew
-correction follows a settled electrical estimate inside them while the drive runs
-([sampling skew](platform-sampling-skew.md) Part C).
+The resistance and inductance bands also gate the one use of an estimate that needs no stop. The sampling-skew
+correction follows a settled electrical estimate inside them while the drive runs ([sampling
+skew](platform-sampling-skew.md) Part C).
 
 ### Part C — When it is applied
 
@@ -94,8 +97,9 @@ correction follows a settled electrical estimate inside them while the drive run
 | Automatic  | Every stop of a running drive applies the candidates that have met the dwell                                    |
 
 The mode is a drive-wide setting of the configuration record ([service-nvm.md](service-nvm.md)), read and written over CAN
-([service-can.md](service-can.md), contract 2.17). The CAN Commander chooses it on its Configuration tab and shows the model in
-use, the counters and the Recalibrate and Reset Model commands on its Diagnostics tab ([tool-can-commander.md](tool-can-commander.md)).
+([service-can.md](service-can.md), contract 2.17). The CAN Commander chooses it on its Configuration tab. Its
+Diagnostics tab shows the model in use, the counters and the Recalibrate and Reset Model commands
+([tool-can-commander.md](tool-can-commander.md)).
 
 ```mermaid
 stateDiagram-v2
@@ -111,30 +115,30 @@ stateDiagram-v2
 
 ### Part D — How it is applied
 
-Applying a model redesigns the current loop from the resistance and inductance in use and the speed loop, and in
-position mode the position loop, from the inertia and friction in use, with the record's flux linkage and pole
-pairs. The operator's loop settings are then applied again, so the bandwidths do not change. It happens only while
-the drive is stopped, so neither control interrupt runs a loop half-redesigned; the next Enable resets the loops
-as it always does. The estimators are not seeded again: they keep tracking from where they are, and the model in use
-now agrees with them.
+Applying a model redesigns the current loop from the resistance and inductance in use. It redesigns the speed loop,
+and in position mode the position loop, from the inertia and friction in use. The redesign uses the record's flux
+linkage and pole pairs. The operator's loop settings are then applied again, so the bandwidths do not change. It
+happens only while the drive is stopped, so neither control interrupt runs a loop half-redesigned. The next Enable
+resets the loops as it always does. The estimators are not seeded again: they keep tracking from where they are, and
+the model in use now agrees with them.
 
 ### Part E — Reporting
 
 Each applied quantity and each rejected candidate is traced with its value and its commissioned value. Two counters
 of applied quantities and rejected candidates, and the four quantities of the model in use, are read-only
-parameters over CAN; the motor parameters keep reading the calibration record. The counters restart at power-up.
+parameters over CAN. The motor parameters keep reading the calibration record. The counters restart at power-up.
 
 ---
 
 ### Part F — Storing the model
 
 A recalibration that changes the inductance, inertia or viscous friction in use stores the three of them in the
-learned-model record ([service-nvm.md](service-nvm.md)), with a check of the commissioned values they were learned from. The
-resistance is never stored.
+learned-model record ([service-nvm.md](service-nvm.md)). It stores them with a check of the commissioned values they were
+learned from. The resistance is never stored.
 
 - **Rate.** At most one store every 15 minutes of uptime. The first change after power-up is stored at the stop that
-  made it. A change made sooner waits, and the first stop once the 15 minutes have passed stores the model then in
-  use, so only the latest of several waiting changes reaches the record. A store that finds the device busy is tried
+  made it. A change made sooner waits. The first stop once the 15 minutes have passed stores the model
+  then in use. Only the latest of several waiting changes therefore reaches the record. A store that finds the device busy is tried
   again 10 ms later; one that fails waits for the next window.
 - **Mode off** never stores, and runs the commissioned model; the stored values are kept for when the mode is turned
   on again.

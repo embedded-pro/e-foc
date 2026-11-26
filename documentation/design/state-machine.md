@@ -48,14 +48,14 @@ date: 2026-11-26
 
 The state machine has six named states:
 
-| State       | Motor condition                                                                                                                       | Allowed transitions                                                                                                                                                                                                                                                                                                              |
-|-------------|---------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Idle        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled                 | → Calibrating (Calibrate, Re-align with loaded parameters, or Reserve External Calibration), → Ready (boot load completes with a complete record and either a rotor reference kept by a control-mode switch or an index angle an index search can restore it from), → Idle (Clear Calibration), → Fault (hardware fault)        |
-| Calibrating | Calibration sequence in progress; motor is driven by identification services, under a provisional plant model for the mechanical step | → Ready (sequence complete + NVM saved, or Emergency Stop / Release External Calibration with previously valid calibration), → Idle (record saved but incomplete for this mode, or Emergency Stop / Release External Calibration without valid calibration), → Fault (any step or the NVM save fails, or hardware fault)         |
-| Ready       | Calibration data valid, rotor reference established or restorable from the encoder index; motor can be enabled                        | → Enabled (Enable, only when the rotor reference is valid; the first after power-up, a mode switch or a Fault re-measures the offsets), → Calibrating (Calibrate re-runs, Re-align, or Reserve External Calibration), → Idle (Clear Calibration), → Fault (hardware fault, or the NVM invalidation failing)                      |
-| Enabled     | FOC controller active; motor under closed-loop control                                                                                | → Stopping (Quick Stop), → Ready (Disable, or Emergency Stop with valid calibration), → Idle (Emergency Stop without valid calibration), → Fault (hardware fault)                                                                                                                                                                 |
-| Stopping    | FOC controller active; the drive decelerates the rotor to a standstill under control (Quick Stop below)                               | → Ready (the rotor below 2 rad/s, the stop deadline, Disable, or Emergency Stop with valid calibration), → Idle (Emergency Stop without valid calibration), → Fault (hardware fault)                                                                                                                                              |
-| Fault       | Safe state; inverter stopped; fault code recorded and latched                                                                         | → Ready (Clear Fault with valid calibration held), → Idle (Clear Fault without it); at most 3 consecutive times. A further fault re-enters Fault but keeps the code that first tripped the drive                                                                                                                                 |
+| State       | Motor condition                                                                                                                       | Allowed transitions                                                                                                                                                                                                                                                                                                      |
+|-------------|---------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Idle        | No calibration data, or electrical parameters loaded but rotor reference not yet established; motor cannot be enabled                 | → Calibrating (Calibrate, Re-align with loaded parameters, or Reserve External Calibration), → Ready (boot load completes with a complete record and either a rotor reference kept by a control-mode switch or an index angle an index search can restore it from), → Idle (Clear Calibration), → Fault (hardware fault) |
+| Calibrating | Calibration sequence in progress; motor is driven by identification services, under a provisional plant model for the mechanical step | → Ready (sequence complete + NVM saved, or Emergency Stop / Release External Calibration with previously valid calibration), → Idle (record saved but incomplete for this mode, or Emergency Stop / Release External Calibration without valid calibration), → Fault (any step or the NVM save fails, or hardware fault) |
+| Ready       | Calibration data valid, rotor reference established or restorable from the encoder index; motor can be enabled                        | → Enabled (Enable, only when the rotor reference is valid; the first after power-up, a mode switch or a Fault re-measures the offsets), → Calibrating (Calibrate re-runs, Re-align, or Reserve External Calibration), → Idle (Clear Calibration), → Fault (hardware fault, or the NVM invalidation failing)              |
+| Enabled     | FOC controller active; motor under closed-loop control                                                                                | → Stopping (Quick Stop), → Ready (Disable, or Emergency Stop with valid calibration), → Idle (Emergency Stop without valid calibration), → Fault (hardware fault)                                                                                                                                                        |
+| Stopping    | FOC controller active; the drive decelerates the rotor to a standstill under control (Quick Stop below)                               | → Ready (the rotor below 2 rad/s, the stop deadline, Disable, or Emergency Stop with valid calibration), → Idle (Emergency Stop without valid calibration), → Fault (hardware fault)                                                                                                                                     |
+| Fault       | Safe state; inverter stopped; fault code recorded and latched                                                                         | → Ready (Clear Fault with valid calibration held), → Idle (Clear Fault without it); at most 3 consecutive times. A further fault re-enters Fault but keeps the code that first tripped the drive                                                                                                                         |
 
 ### State Diagram
 
@@ -185,20 +185,20 @@ The common lifecycle core composes the machine. It does not hold the lifecycle l
 table-driven machine and hands the rows a lifecycle context: references to the collaborators that do
 the work, each with one responsibility.
 
-| Collaborator           | Responsibility                                                                                                                      |
-|------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| Lifecycle table        | The 49 rows and the entered hooks; the only place that knows which event is legal in which state                                    |
-| Calibration flow       | Full calibration, re-alignment and external calibration: running the orchestrator, saving the record and completing the command     |
-| Maintenance flow       | Clearing the stored calibration and editing the motor parameters it holds                                                           |
+| Collaborator           | Responsibility                                                                                                                        |
+|------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| Lifecycle table        | The 49 rows and the entered hooks; the only place that knows which event is legal in which state                                      |
+| Calibration flow       | Full calibration, re-alignment and external calibration: running the orchestrator, saving the record and completing the command       |
+| Maintenance flow       | Clearing the stored calibration and editing the motor parameters it holds                                                             |
 | Boot sequence          | The boot-time validity check and load of the stored record, and the move to Ready when a control-mode switch kept the rotor reference |
-| Operation flow         | Enable and disable, faults and emergency stop, and the post-commit work of every state                                              |
-| Pending command        | The one outstanding operator command, and the result held back until the target state has been committed                            |
-| Command rejections     | The observer that completes a queued command's callback with *rejected* when the table refuses it                                   |
-| NVM activity           | The count of NVM operations whose callbacks still capture the machine; part of the pending-work check. See C2a for its owner        |
-| Calibration context    | The calibration record in RAM and its application to the controller                                                                |
-| Commissioning commands | Re-alignment, the external-calibration reservation and completion, and motor-parameter edits, each dispatched as its event          |
-| Mode hooks             | The interface through which the flows reach the control mode: the controller, its tunables and the mode-specific calibration steps  |
-| Default mode hooks     | The mode-specific hooks that a control mode need not override; the common lifecycle core supplies them                               |
+| Operation flow         | Enable and disable, faults and emergency stop, and the post-commit work of every state                                                |
+| Pending command        | The one outstanding operator command, and the result held back until the target state has been committed                              |
+| Command rejections     | The observer that completes a queued command's callback with *rejected* when the table refuses it                                     |
+| NVM activity           | The count of NVM operations whose callbacks still capture the machine; part of the pending-work check. See C2a for its owner          |
+| Calibration context    | The calibration record in RAM and its application to the controller                                                                   |
+| Commissioning commands | Re-alignment, the external-calibration reservation and completion, and motor-parameter edits, each dispatched as its event            |
+| Mode hooks             | The interface through which the flows reach the control mode: the controller, its tunables and the mode-specific calibration steps    |
+| Default mode hooks     | The mode-specific hooks that a control mode need not override; the common lifecycle core supplies them                                |
 
 The control-mode state machine owns the NVM activity count, not the common lifecycle core (C2a).
 
@@ -217,12 +217,12 @@ completes with *aborted by fault*.
 
 The resulting state depends on the state the command was issued from:
 
-| Issued from                    | Resulting state | Rationale                                                                          |
-|--------------------------------|-----------------|------------------------------------------------------------------------------------|
-| Enabled, Stopping or Calibrating | Ready         | Calibration data in memory and NVM is still valid; the motor stays enableable      |
-| Enabled, Stopping or Calibrating | Idle          | No valid calibration data is held, so the motor must be calibrated before enabling |
-| Idle, Ready                    | unchanged       | The machine is already stopped; only the inverter stop is (re)issued               |
-| Fault                          | Fault           | The fault state is safe and must be cleared explicitly with Clear Fault            |
+| Issued from                      | Resulting state | Rationale                                                                          |
+|----------------------------------|-----------------|------------------------------------------------------------------------------------|
+| Enabled, Stopping or Calibrating | Ready           | Calibration data in memory and NVM is still valid; the motor stays enableable      |
+| Enabled, Stopping or Calibrating | Idle            | No valid calibration data is held, so the motor must be calibrated before enabling |
+| Idle, Ready                      | unchanged       | The machine is already stopped; only the inverter stop is (re)issued               |
+| Fault                            | Fault           | The fault state is safe and must be cleared explicitly with Clear Fault            |
 
 Clear Fault returns to Ready when valid calibration is held and to Idle when it is not. It does not
 always return to Idle. Clearing releases the latch, so the next Enable is accepted, not refused.
@@ -332,19 +332,19 @@ sequenceDiagram
 
 **Steps and data produced:**
 
-| Step                                                  | Service             | Data stored                                                       |
-|-------------------------------------------------------|---------------------|-------------------------------------------------------------------|
-| Rotor at rest ([Service: Rotor Standstill](service-standstill.md)) | Rotor Standstill | Nothing; fails the calibration after 10 s               |
-| 0. Current sensor offsets                             | Current Offsets     | The offsets of phases A, B and C                                  |
-| 1. Pole pairs                                         | Electrical Ident    | Pole pairs                                                        |
-| 2. Resistance and inductance                          | Electrical Ident    | Phase resistance, d-axis inductance                               |
-| 3. Alignment                                          | Motor Alignment     | Nothing; the rotor reference is held in RAM                       |
-| 3b. Index search (encoder with an index)              | Index Search        | Encoder index angle; none when no index is found                  |
-| 3a. Flux linkage (every mode)                         | Flux Linkage Ident  | Flux linkage; the configured value when not identified            |
-| 4. Apply measured model + provisional plant           | FOC controller      | Nothing persisted; makes the loops able to move the rotor         |
-| 5. Mechanical parameters (speed/position only)        | Mechanical Ident    | Inertia, viscous friction, speed-loop bandwidth (fixed 100 rad/s) |
-| 6. Cogging map (speed/position only)                  | Cogging Mapping     | Cogging map and its scale, Coulomb friction                       |
-| 7. NVM persist                                        | Non-Volatile Memory | All of the above written to non-volatile memory                   |
+| Step                                                               | Service             | Data stored                                                       |
+|--------------------------------------------------------------------|---------------------|-------------------------------------------------------------------|
+| Rotor at rest ([Service: Rotor Standstill](service-standstill.md)) | Rotor Standstill    | Nothing; fails the calibration after 10 s                         |
+| 0. Current sensor offsets                                          | Current Offsets     | The offsets of phases A, B and C                                  |
+| 1. Pole pairs                                                      | Electrical Ident    | Pole pairs                                                        |
+| 2. Resistance and inductance                                       | Electrical Ident    | Phase resistance, d-axis inductance                               |
+| 3. Alignment                                                       | Motor Alignment     | Nothing; the rotor reference is held in RAM                       |
+| 3b. Index search (encoder with an index)                           | Index Search        | Encoder index angle; none when no index is found                  |
+| 3a. Flux linkage (every mode)                                      | Flux Linkage Ident  | Flux linkage; the configured value when not identified            |
+| 4. Apply measured model + provisional plant                        | FOC controller      | Nothing persisted; makes the loops able to move the rotor         |
+| 5. Mechanical parameters (speed/position only)                     | Mechanical Ident    | Inertia, viscous friction, speed-loop bandwidth (fixed 100 rad/s) |
+| 6. Cogging map (speed/position only)                               | Cogging Mapping     | Cogging map and its scale, Coulomb friction                       |
+| 7. NVM persist                                                     | Non-Volatile Memory | All of the above written to non-volatile memory                   |
 
 The sequence starts only once the rotor is at rest. The encoder must stay within 2 mrad of where a
 100 ms window began, which bounds the speed to 0.02 rad/s. A rotor still turning after 10 s fails the
@@ -1108,15 +1108,15 @@ invariants that make runtime mode switching safe and predictable.
 
 The coordinator delegates each concern to one part:
 
-| Part                 | Concern                                                                                           |
-|----------------------|---------------------------------------------------------------------------------------------------|
-| Active drive         | The mode machines, the active machine and its controller interfaces, calibration reads           |
-| Drive commands       | Setpoints for the active mode, and the current, bus-voltage and configured limits applied to it   |
-| Mode selection       | Select: the persisted default mode, the activation and the rollback (C2)                          |
-| Setting transaction  | The gate every setting passes and the one setting whose callback is pending                       |
-| Tuning settings      | Loop bandwidths and tunings, stored and effective, and motor parameters                           |
-| Algorithm settings   | Selection and persistence of the current, speed and position laws                                 |
-| Model recalibration  | Online observation, commissioning, the recalibration decision, its storage and the redesign       |
+| Part                | Concern                                                                                         |
+|---------------------|-------------------------------------------------------------------------------------------------|
+| Active drive        | The mode machines, the active machine and its controller interfaces, calibration reads          |
+| Drive commands      | Setpoints for the active mode, and the current, bus-voltage and configured limits applied to it |
+| Mode selection      | Select: the persisted default mode, the activation and the rollback (C2)                        |
+| Setting transaction | The gate every setting passes and the one setting whose callback is pending                     |
+| Tuning settings     | Loop bandwidths and tunings, stored and effective, and motor parameters                         |
+| Algorithm settings  | Selection and persistence of the current, speed and position laws                               |
+| Model recalibration | Online observation, commissioning, the recalibration decision, its storage and the redesign     |
 
 The control-mode state machine itself owns the configuration record and its writer. It activates a mode, which keeps
 the rotor reference and re-applies the limits. It restores the persisted algorithms, tunings and model when the new
@@ -1167,11 +1167,11 @@ The non-volatile memory service serves one operation at a time. It answers a con
 not queue it. The control-mode state machine, which outlives every mode switch, therefore owns the NVM activity
 count. Every writer of the shared non-volatile memory brackets its operation with it:
 
-| Writer                                                   | Accounting                                                              |
-|----------------------------------------------------------|-------------------------------------------------------------------------|
-| Calibration, maintenance and boot flows                  | A reference to the shared counter in the lifecycle environment          |
-| The configuration write of Select, and its rollback write | Raised before and released after each write                            |
-| The configuration writer, for every other write          | Raised before the first attempt, released once no write or rewrite is left |
+| Writer                                                    | Accounting                                                                 |
+|-----------------------------------------------------------|----------------------------------------------------------------------------|
+| Calibration, maintenance and boot flows                   | A reference to the shared counter in the lifecycle environment             |
+| The configuration write of Select, and its rollback write | Raised before and released after each write                                |
+| The configuration writer, for every other write           | Raised before the first attempt, released once no write or rewrite is left |
 
 The pending-work check is therefore true while any of them is outstanding. Every guard built on it refuses and does
 not collide: Calibrate, Enable, Clear Calibration and Select.
@@ -1279,55 +1279,55 @@ sequenceDiagram
 
 ### Provided
 
-| Interface                   | Purpose                                                                                | Contract                                                                                                                                                                                                                                     |
-|-----------------------------|----------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Lifecycle controller        | Abstract lifecycle controller — state query and command dispatch                       | Constructed once per application. All commands are safe to call from any state: a command without a row in the current state is rejected with a status and traced, never applied                                                            |
-| State query                 | Returns the current state for inspection                                               | Valid for the lifetime of the state machine                                                                                                                                                                                                  |
-| Last fault code             | Returns the most recent fault code                                                     | Returns *none* until the first fault occurs. Afterwards it keeps the last fault code, also after the fault is cleared                                                                                                                        |
-| Calibrate                   | Requests start of the full calibration sequence                                        | Only effective from Idle or Ready; ignored from all other states                                                                                                                                                                             |
-| Re-align                    | Re-establishes the rotor reference without R/L or mechanical identification            | Only effective from Idle or Ready with valid electrical calibration loaded. Enters Calibrating (alignment sub-step only), then Ready with a valid rotor reference on success, or Fault on failure                                             |
-| Enable                      | Requests enabling the FOC controller                                                   | Only effective from Ready when the rotor reference is valid; rejected when the rotor reference has not been established since the last reset                                                                                                 |
-| Disable                     | Requests disabling the FOC controller                                                  | Only effective from Enabled and Stopping; ignored from all other states                                                                                                                                                                      |
-| Clear Fault                 | Clears the fault and returns to Ready if valid calibration is held, otherwise Idle     | Only effective from Fault; ignored from all other states                                                                                                                                                                                     |
-| Clear Calibration           | Invalidates NVM calibration and returns to Idle                                        | Only effective from Idle or Ready; ignored from Calibrating, Enabled and Fault. On NVM failure transitions to Fault                                                                                                                          |
-| Quick Stop                  | Decelerates the rotor under control, then stops the power stage                        | From Enabled enters Stopping, *ok*; Ready below 2 rad/s or at the deadline. Rejected when the mode cannot brake and in Calibrating; no effect in Stopping, Idle, Ready, Fault                                                                |
-| Emergency Stop              | Stops the power stage immediately and leaves the active states                         | Accepted from every state and always returns *ok*. From Enabled, Stopping or Calibrating it goes to Ready when calibration data is valid, otherwise to Idle. Idle, Ready and Fault stay unchanged. Aborts any pending command with *aborted by fault* |
-| Pending asynchronous work   | Reports whether a service callback that captures the machine is outstanding            | True while a command callback is pending, any NVM operation is in flight, a calibration step is running, or a fault latched in an interrupt still owes its transition. The control-mode state machine uses it to refuse destroying the machine |
-| Partial calibration query   | Reports whether Idle holds a non-empty but incomplete NVM record                       | True only in Idle, when the stage is not *complete* but pole pairs or resistance are non-zero (an old-schema or interrupted record). The CAN bridge uses it to broadcast the partial-calibration motor state instead of Idle                 |
-| Apply online estimates      | Retunes speed and current PID gains from online estimators                             | Only effective from Enabled; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only                                                                                            |
-| Apply model                 | Redesigns the current and speed loops from a motor model                               | Only effective while stopped; returns false otherwise. Keeps the estimators' state. Speed/position modes only ([Online Recalibration](online-recalibration.md))                                                                              |
+| Interface                 | Purpose                                                                            | Contract                                                                                                                                                                                                                                              |
+|---------------------------|------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Lifecycle controller      | Abstract lifecycle controller — state query and command dispatch                   | Constructed once per application. All commands are safe to call from any state: a command without a row in the current state is rejected with a status and traced, never applied                                                                      |
+| State query               | Returns the current state for inspection                                           | Valid for the lifetime of the state machine                                                                                                                                                                                                           |
+| Last fault code           | Returns the most recent fault code                                                 | Returns *none* until the first fault occurs. Afterwards it keeps the last fault code, also after the fault is cleared                                                                                                                                 |
+| Calibrate                 | Requests start of the full calibration sequence                                    | Only effective from Idle or Ready; ignored from all other states                                                                                                                                                                                      |
+| Re-align                  | Re-establishes the rotor reference without R/L or mechanical identification        | Only effective from Idle or Ready with valid electrical calibration loaded. Enters Calibrating (alignment sub-step only), then Ready with a valid rotor reference on success, or Fault on failure                                                     |
+| Enable                    | Requests enabling the FOC controller                                               | Only effective from Ready when the rotor reference is valid; rejected when the rotor reference has not been established since the last reset                                                                                                          |
+| Disable                   | Requests disabling the FOC controller                                              | Only effective from Enabled and Stopping; ignored from all other states                                                                                                                                                                               |
+| Clear Fault               | Clears the fault and returns to Ready if valid calibration is held, otherwise Idle | Only effective from Fault; ignored from all other states                                                                                                                                                                                              |
+| Clear Calibration         | Invalidates NVM calibration and returns to Idle                                    | Only effective from Idle or Ready; ignored from Calibrating, Enabled and Fault. On NVM failure transitions to Fault                                                                                                                                   |
+| Quick Stop                | Decelerates the rotor under control, then stops the power stage                    | From Enabled enters Stopping, *ok*; Ready below 2 rad/s or at the deadline. Rejected when the mode cannot brake and in Calibrating; no effect in Stopping, Idle, Ready, Fault                                                                         |
+| Emergency Stop            | Stops the power stage immediately and leaves the active states                     | Accepted from every state and always returns *ok*. From Enabled, Stopping or Calibrating it goes to Ready when calibration data is valid, otherwise to Idle. Idle, Ready and Fault stay unchanged. Aborts any pending command with *aborted by fault* |
+| Pending asynchronous work | Reports whether a service callback that captures the machine is outstanding        | True while a command callback is pending, any NVM operation is in flight, a calibration step is running, or a fault latched in an interrupt still owes its transition. The control-mode state machine uses it to refuse destroying the machine        |
+| Partial calibration query | Reports whether Idle holds a non-empty but incomplete NVM record                   | True only in Idle, when the stage is not *complete* but pole pairs or resistance are non-zero (an old-schema or interrupted record). The CAN bridge uses it to broadcast the partial-calibration motor state instead of Idle                          |
+| Apply online estimates    | Retunes speed and current PID gains from online estimators                         | Only effective from Enabled; silently ignored from all other states. Skips non-physical estimates (non-finite or <= 0). Speed/position modes only                                                                                                     |
+| Apply model               | Redesigns the current and speed loops from a motor model                           | Only effective while stopped; returns false otherwise. Keeps the estimators' state. Speed/position modes only ([Online Recalibration](online-recalibration.md))                                                                                       |
 
 ### Required
 
-| Interface                                  | Purpose                                                                               | Contract                                                                                                                                      |
-|--------------------------------------------|---------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| Non-volatile memory                        | Persists and retrieves calibration data across power cycles                           | Must stay valid for the lifetime of the state machine                                                                                         |
-| Electrical parameters identification       | Estimates pole pairs, phase resistance, and dq inductances                            | Operations are asynchronous; callback fires on the same event loop                                                                            |
-| Motor alignment                            | Forces rotor to a known angle and returns the encoder zero offset                     | Operation is asynchronous; result is optional (an empty result is a failure)                                                                  |
-| Index search (optional)                    | Finds the encoder index; re-references the encoder to a stored index angle            | Operation is asynchronous; result is optional (an empty result is not found); absent or unavailable without an index channel                  |
-| Mechanical parameters identification       | Estimates rotor inertia and viscous friction (speed/position modes only)              | Operation is asynchronous; result is optional (an empty result is a failure)                                                                  |
-| Fault notifier                             | Delivers hardware fault notifications to the state machine                            | Registration happens during construction; callback may fire at any time. On the target, the platform fault notifier implements it            |
-| Three-phase inverter                       | Used by the FOC controller to apply the duty cycles and read phase currents           | Stopped immediately on any fault from the Enabled or Calibrating state                                                                       |
-| Encoder                                    | Rotor position sensor; zero point established by the alignment step or the index      | Read-only for the state machine. The motor alignment sets its zero and the index search sets its reading, never the state machine itself      |
-| Tracer                                     | Debug trace output for lifecycle events                                               | All state transitions and calibration steps are traced                                                                                        |
-| Online friction and inertia estimator      | Online RLS estimator for rotor inertia and viscous friction (speed/position only)     | Seeded from calibration data; torque constant 3/2·p·ψf from the record set on entering Enabled; updates run while FOC outer loop is active    |
-| Online resistance and inductance estimator | Online RLS estimator for phase resistance and d-axis inductance (speed/position only) | Assumes non-salient motor (Ld ≈ Lq); seeded with the d-axis inductance from calibration                                                       |
+| Interface                                  | Purpose                                                                               | Contract                                                                                                                                   |
+|--------------------------------------------|---------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| Non-volatile memory                        | Persists and retrieves calibration data across power cycles                           | Must stay valid for the lifetime of the state machine                                                                                      |
+| Electrical parameters identification       | Estimates pole pairs, phase resistance, and dq inductances                            | Operations are asynchronous; callback fires on the same event loop                                                                         |
+| Motor alignment                            | Forces rotor to a known angle and returns the encoder zero offset                     | Operation is asynchronous; result is optional (an empty result is a failure)                                                               |
+| Index search (optional)                    | Finds the encoder index; re-references the encoder to a stored index angle            | Operation is asynchronous; result is optional (an empty result is not found); absent or unavailable without an index channel               |
+| Mechanical parameters identification       | Estimates rotor inertia and viscous friction (speed/position modes only)              | Operation is asynchronous; result is optional (an empty result is a failure)                                                               |
+| Fault notifier                             | Delivers hardware fault notifications to the state machine                            | Registration happens during construction; callback may fire at any time. On the target, the platform fault notifier implements it          |
+| Three-phase inverter                       | Used by the FOC controller to apply the duty cycles and read phase currents           | Stopped immediately on any fault from the Enabled or Calibrating state                                                                     |
+| Encoder                                    | Rotor position sensor; zero point established by the alignment step or the index      | Read-only for the state machine. The motor alignment sets its zero and the index search sets its reading, never the state machine itself   |
+| Tracer                                     | Debug trace output for lifecycle events                                               | All state transitions and calibration steps are traced                                                                                     |
+| Online friction and inertia estimator      | Online RLS estimator for rotor inertia and viscous friction (speed/position only)     | Seeded from calibration data; torque constant 3/2·p·ψf from the record set on entering Enabled; updates run while FOC outer loop is active |
+| Online resistance and inductance estimator | Online RLS estimator for phase resistance and d-axis inductance (speed/position only) | Assumes non-salient motor (Ld ≈ Lq); seeded with the d-axis inductance from calibration                                                    |
 
 ---
 
 ## Data Model
 
-| Entity             | Field                | Type / Unit             | Range     | Notes                                                                                                                                                                                                 |
-|--------------------|----------------------|-------------------------|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Calibration record | Pole pairs           | count (uint8)           | 1–255     | Number of electrical pole pairs                                                                                                                                                                       |
-| Calibration record | Phase resistance     | Ohm (float)             | > 0       | Phase resistance identified by electrical ident                                                                                                                                                       |
-| Calibration record | d-axis inductance    | mH (float)              | > 0       | Phase inductance, used for both axes (anisotropy not estimated)                                                                                                                                       |
-| Calibration record | Encoder index angle  | rad (float), mechanical | [−π, π)   | Reading at the encoder index in the aligned frame; NaN when none was found. Applied only at a live index pulse                                                                                        |
-| Calibration record | Inertia              | N·m·s² (float)          | ≥ 0       | Rotor inertia; populated only for speed/position modes                                                                                                                                                |
-| Calibration record | Viscous friction     | N·m·s/rad (float)       | ≥ 0       | Viscous friction coefficient; populated only for speed/position modes                                                                                                                                 |
-| Calibration record | Coulomb friction     | N·m (float)             | ≥ 0       | Dry friction measured by the cogging step; 0 when not measured, read as no friction feed-forward                                                                                                      |
-| Calibration record | Speed-loop bandwidth | rad/s (float)           | ≥ 0       | Speed-loop bandwidth; not measured: the mechanical identification writes a fixed 100 rad/s, for speed/position modes only                                                                             |
-| Fault code         | —                    | enumeration (uint8)     | 14 values | none, overcurrent, overvoltage, undervoltage, overtemperature, encoder loss, hardware fault, calibration failed, stall, phase missing, overspeed, following error, command timeout, position limit    |
+| Entity             | Field                | Type / Unit             | Range     | Notes                                                                                                                                                                                              |
+|--------------------|----------------------|-------------------------|-----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Calibration record | Pole pairs           | count (uint8)           | 1–255     | Number of electrical pole pairs                                                                                                                                                                    |
+| Calibration record | Phase resistance     | Ohm (float)             | > 0       | Phase resistance identified by electrical ident                                                                                                                                                    |
+| Calibration record | d-axis inductance    | mH (float)              | > 0       | Phase inductance, used for both axes (anisotropy not estimated)                                                                                                                                    |
+| Calibration record | Encoder index angle  | rad (float), mechanical | [−π, π)   | Reading at the encoder index in the aligned frame; NaN when none was found. Applied only at a live index pulse                                                                                     |
+| Calibration record | Inertia              | N·m·s² (float)          | ≥ 0       | Rotor inertia; populated only for speed/position modes                                                                                                                                             |
+| Calibration record | Viscous friction     | N·m·s/rad (float)       | ≥ 0       | Viscous friction coefficient; populated only for speed/position modes                                                                                                                              |
+| Calibration record | Coulomb friction     | N·m (float)             | ≥ 0       | Dry friction measured by the cogging step; 0 when not measured, read as no friction feed-forward                                                                                                   |
+| Calibration record | Speed-loop bandwidth | rad/s (float)           | ≥ 0       | Speed-loop bandwidth; not measured: the mechanical identification writes a fixed 100 rad/s, for speed/position modes only                                                                          |
+| Fault code         | —                    | enumeration (uint8)     | 14 values | none, overcurrent, overvoltage, undervoltage, overtemperature, encoder loss, hardware fault, calibration failed, stall, phase missing, overspeed, following error, command timeout, position limit |
 
 A watchdog expiry has no fault code. It cuts the power stage from the watchdog interrupt, and the hardware resets the
 target. No dispatcher turn follows in which a latched fault code could be read or broadcast. The expiry is reported

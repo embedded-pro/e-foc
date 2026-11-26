@@ -98,7 +98,7 @@ graph TD
 
 The control-mode selector does the pending-work check before it starts a mode switch. If work is pending, the selection returns *busy* and the caller retries. If no work is pending, the mode switch proceeds.
 
-The lifecycle transition table uses the same check as the guard of each command that starts asynchronous work (Calibrate, ReAlign, ReserveExternalCalibration, ClearCalibration, SetFluxLinkage) and of Enable. Thus a request never overlaps outstanding work of an earlier request (see the transition table section of [state-machine.md](state-machine.md)).
+The lifecycle transition table uses the same check as a guard. It guards Enable and each command that starts asynchronous work (Calibrate, ReAlign, ReserveExternalCalibration, ClearCalibration, SetFluxLinkage). Thus a request never overlaps outstanding work of an earlier request (see the transition table section of [state-machine.md](state-machine.md)).
 
 Each identification service reports whether it is running. This report tells whether the service actively runs an identification sweep, not only whether deferred work is queued. The pending-work check at mode-switch time and the weak-reference discard at dispatch time together cover all failure scenarios.
 
@@ -201,18 +201,18 @@ sequenceDiagram
 
 ### Provided
 
-| Interface       | Purpose                                                                  | Contract                                                                                   |
-|-----------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
-| Lifetime anchor | Holds a service so that its weak references expire when the anchor goes  | The service supports weak references to itself; all weak references go before the anchor   |
+| Interface       | Purpose                                                                   | Contract                                                                                           |
+|-----------------|---------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| Lifetime anchor | Holds a service so that its weak references expire when the anchor goes   | The service supports weak references to itself; all weak references go before the anchor           |
 | Running report  | Each identification service reports whether an estimation sweep is active | Running from the start request until the estimation completes, the done callback runs, or an abort |
 
 ### Required
 
-| Interface                  | Purpose                                                                        | Contract                                                                                    |
-|----------------------------|--------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
-| Weak-reference dispatcher  | Defers work and discards it if its weak reference expired before it runs       | The globally active dispatcher; work is scheduled with a weak reference, never without one   |
-| Weak references to self    | Lets the service give out weak references to itself                            | The service is built inside a lifetime anchor; a bare service gives null references          |
-| Pending-work check         | The control-mode selector checks it before a mode switch                       | Reports pending work while an identification service runs or an asynchronous command is outstanding |
+| Interface                 | Purpose                                                                  | Contract                                                                                            |
+|---------------------------|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
+| Weak-reference dispatcher | Defers work and discards it if its weak reference expired before it runs | The globally active dispatcher; work is scheduled with a weak reference, never without one          |
+| Weak references to self   | Lets the service give out weak references to itself                      | The service is built inside a lifetime anchor; a bare service gives null references                 |
+| Pending-work check        | The control-mode selector checks it before a mode switch                 | Reports pending work while an identification service runs or an asynchronous command is outstanding |
 
 The weak-reference dispatcher also accepts deferred work without a weak reference. That form does not check the lifetime, so this pattern does not use it. A bare service, built outside an anchor, gives null weak references, so the dispatcher always discards its deferred work. The control mode that owns an identification service adds the running report of that service to its pending-work check.
 
@@ -220,13 +220,13 @@ The weak-reference dispatcher also accepts deferred work without a weak referenc
 
 ## Constraints & Limitations
 
-| Constraint                         | Description                                                                         |
-|------------------------------------|-------------------------------------------------------------------------------------|
-| Lifetime-anchor invariant          | All weak references go before the anchor. Test fixtures drain the dispatcher at teardown. |
-| FIFO ordering required             | The production safety argument depends on FIFO processing of deferred work.         |
-| Service supports weak references   | Without this support, the anchor gives no benefit.                                  |
-| Static objects exempt              | Objects with application-static lifetime do not need this pattern.                  |
-| Callbacks an interrupt invokes     | Such a callback is a hot-swappable callback, never a plain callback.                |
+| Constraint                       | Description                                                                               |
+|----------------------------------|-------------------------------------------------------------------------------------------|
+| Lifetime-anchor invariant        | All weak references go before the anchor. Test fixtures drain the dispatcher at teardown. |
+| FIFO ordering required           | The production safety argument depends on FIFO processing of deferred work.               |
+| Service supports weak references | Without this support, the anchor gives no benefit.                                        |
+| Static objects exempt            | Objects with application-static lifetime do not need this pattern.                        |
+| Callbacks an interrupt invokes   | Such a callback is a hot-swappable callback, never a plain callback.                      |
 
 A test fixture that holds an anchored member must drain the dispatcher at teardown. A scheduler change that breaks FIFO ordering must be audited against this pattern.
 

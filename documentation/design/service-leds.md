@@ -28,8 +28,9 @@ date: 2026-11-26
 
 ## Responsibilities
 
-A person at the drive has no terminal and no CAN tool. Three LEDs on the board tell them, at a glance, whether the
-firmware runs, whether the motor is being driven, whether the drive is being commissioned and, when it stopped, why.
+A person at the drive has no terminal and no CAN tool. Three LEDs on the board tell them the status at a glance. The LEDs
+show whether the firmware runs, whether the motor is being driven and whether the drive is being commissioned. When
+the drive stopped, they show why.
 Requirements: REQ-UI-001, REQ-UI-002, REQ-UI-003.
 
 **Is responsible for:**
@@ -45,8 +46,8 @@ Requirements: REQ-UI-001, REQ-UI-002, REQ-UI-003.
 
 ### Part A — Status source
 
-The service reads the drive through a small interface it is given: the lifecycle state (Idle, Calibrating, Ready,
-Enabled, Fault) and the fault code of the fault the drive is in. The state machine knows nothing of the service.
+The service reads the drive through a small interface it is given. The interface supplies the lifecycle state
+(Idle, Calibrating, Ready, Enabled, Fault) and the fault code of the fault the drive is in. The state machine knows nothing of the service.
 The application adapts the active control mode's state machine to the interface, the same state and fault code
 the CAN telemetry reports. Before the control mode exists, that is during the start-up load of the configuration,
 the adapter reports Idle with no fault.
@@ -95,11 +96,11 @@ commissioning. Amber is steady while calibrating because the rotor may then move
 
 One flash is not used, so that a lone flash is never mistaken for a heartbeat on the other LED.
 
-A fault stays in Fault until it is cleared, so the red LED is never off while a fault is latched: it either flashes
-its group, with at most a 1.5 s pause between two groups, or is steady. The flashing group is the latched
-indication. Whenever the pattern of an LED changes, for instance because the fault has another flash count, that
-LED restarts at its first flash; an LED whose pattern stays the same, such as red between two motion faults, keeps
-its phase.
+A fault stays in Fault until it is cleared. The red LED is therefore never off while a fault is latched. It either
+flashes its group or is steady. The pause between two groups is at most 1.5 s. The flashing group is the latched
+indication. Whenever the pattern of an LED changes, that LED restarts at its first flash. For instance, the pattern
+changes when the fault has another flash count. An LED whose pattern stays the same keeps its phase, such as red
+between two motion faults.
 
 ### Part E — Lifetime
 
@@ -113,9 +114,9 @@ dispatcher but its own repeating timer.
 
 ### Provided
 
-| Interface    | Purpose               | Contract                                                                                                             |
-|--------------|-----------------------|----------------------------------------------------------------------------------------------------------------------|
-| Start        | Starts the indication | Drives the LEDs from the first tick; the three LEDs are configured as outputs and are off when the service goes away |
+| Interface | Purpose               | Contract                                                                                                             |
+|-----------|-----------------------|----------------------------------------------------------------------------------------------------------------------|
+| Start     | Starts the indication | Drives the LEDs from the first tick; the three LEDs are configured as outputs and are off when the service goes away |
 
 ### Required
 
@@ -187,6 +188,6 @@ sequenceDiagram
 | Tick        | 50 ms; every time in a pattern is a whole number of ticks                                        |
 | Latency     | One tick between a transition and its indication                                                 |
 | Context     | Event loop only; never the control interrupts                                                    |
-| Memory      | No allocation; three players and the patterns need no heap                                   |
+| Memory      | No allocation; three players and the patterns need no heap                                       |
 | Power off   | All LEDs are off without power; no pattern can express it                                        |
 | Fault codes | Several faults share the motion code 7; the CAN fault code or the fault history tells them apart |

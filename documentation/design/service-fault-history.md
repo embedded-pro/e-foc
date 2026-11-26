@@ -28,9 +28,9 @@ date: 2026-11-26
 
 ## Responsibilities
 
-The last fault code lives only while the drive is in Fault (`state-machine.md`): a clear or a reset loses
-it, so an intermittent fault — an overvoltage on a deceleration, an over-current burst, a command timeout — leaves
-nothing to diagnose afterwards. The fault history keeps the last eight entries into Fault across power cycles
+The last fault code lives only while the drive is in Fault (`state-machine.md`). A clear or a reset loses
+it. An intermittent fault therefore leaves nothing to diagnose afterwards. Examples are an overvoltage on a
+deceleration, an over-current burst and a command timeout. The fault history keeps the last eight entries into Fault across power cycles
 (REQ-PRO-006).
 
 **Is responsible for:**
@@ -57,16 +57,16 @@ nothing to diagnose afterwards. The fault history keeps the last eight entries i
 | Bus voltage  | V     | 0.01       | ±327 V               | The bus-voltage service's filtered value (`service-bus-voltage.md`)  |
 | Peak current | A     | 0.01       | ±327 A               | Largest magnitude of the measured torque current over the last 10 ms |
 
-The peak current is sampled from the active drive every millisecond on the event loop, so it is the largest of
-the ten one-millisecond torque-current values the drive reported before the fault, not the largest phase-current
-sample: the 20 kHz loop does no per-sample bookkeeping (REQ-PLT-004), and an over-current trip is cut by the
-power stage before any sample reaches the event loop.
+The peak current is sampled from the active drive every millisecond on the event loop. It is therefore the largest
+of the ten one-millisecond torque-current values the drive reported before the fault. It is not the largest
+phase-current sample. The 20 kHz loop does no per-sample bookkeeping (REQ-PLT-004). Also, the power stage cuts an
+over-current trip before any sample reaches the event loop.
 
 ### Part B — Capturing an entry into Fault
 
 The state machine announces each entry into Fault that starts an episode, with the code it records. The history
-then reads the control mode, the latest filtered bus voltage and the peak current, stamps the record with the
-power-up and the time, and keeps it in memory at once, so a read over CAN sees it before it is stored. The
+then reads the control mode, the latest filtered bus voltage and the peak current. It stamps the record with the
+power-up and the time. It keeps the record in memory at once, so a read over CAN sees it before it is stored. The
 oldest of eight records gives way to it.
 
 ### Part C — Storing
@@ -74,13 +74,14 @@ oldest of eight records gives way to it.
 The eight records and the power-up count are stored as one image in a region of their own (`service-nvm.md`,
 Fault History Region). A store starts at most once a second; records captured meanwhile go out with the next
 store. Each load and store is bracketed as outstanding asynchronous work of the control-mode state machine
-(`state-machine.md`, C2a), so a calibration or a configuration write is refused for its duration rather than
-answered *busy*; when the memory is busy with one of those, the store is retried every 10 ms, and a store that does
+(`state-machine.md`, C2a). A calibration or a configuration write is therefore refused for its duration rather than
+answered *busy*. When the memory is busy with one of those, the store is retried every 10 ms. A store that does
 not read back is retried a second later. Each record carries its own check byte, so a store cut short by a power
 loss loses at most the records it was writing.
 
 At power-up the history loads the image, adds one to the power-up count and stores it. An image that does not
-read back as a fault history — a new drive, or one written by another firmware — starts empty at power-up 1.
+read back as a fault history starts empty at power-up 1. Examples are a new drive, or an image written by another
+firmware.
 
 ```mermaid
 stateDiagram-v2
@@ -95,10 +96,10 @@ stateDiagram-v2
 
 ### Part D — Reading and clearing
 
-A record is read by its age: 0 is the newest, 7 the oldest, ordered by power-up and then uptime; an age past the
-records held answers that there is none. Clearing empties the eight records, keeps the power-up count and is
-answered once stored. The non-volatile memory completes a load after the event loop has started, so a read or a clear
-that arrives before the stored faults are known waits for the load and is answered then; at most four
+A record is read by its age: 0 is the newest, 7 the oldest. Records are ordered by power-up and then uptime. An
+age past the records held answers that there is none. Clearing empties the eight records, keeps the power-up count and is
+answered once stored. The non-volatile memory completes a load after the event loop has started. A read or a clear
+that arrives before the stored faults are known therefore waits for the load and is answered then. At most four
 wait, and a fifth releases the oldest at once. The history is read and cleared over CAN (`service-can.md`, contract 2.16).
 
 ---
@@ -127,9 +128,9 @@ wait, and a fifth releases the oldest at once. The history is read and cleared o
 
 ## Constraints & Limitations
 
-| Constraint         | Description                                                                                                        |
-|--------------------|--------------------------------------------------------------------------------------------------------------------|
+| Constraint         | Description                                                                                                                  |
+|--------------------|------------------------------------------------------------------------------------------------------------------------------|
 | Eight records      | On the reference board, calibration and configuration leave 128 bytes of the 512-byte non-volatile memory; eight records fit |
-| No wall clock      | Records are ordered by power-up and uptime; the power-up count saturates at 32767                                  |
-| Torque current     | The peak is the largest one-millisecond torque current, not the largest phase-current sample                       |
-| One store a second | A fault storm keeps the newest records only; the in-memory history is complete until the next power loss           |
+| No wall clock      | Records are ordered by power-up and uptime; the power-up count saturates at 32767                                            |
+| Torque current     | The peak is the largest one-millisecond torque current, not the largest phase-current sample                                 |
+| One store a second | A fault storm keeps the newest records only; the in-memory history is complete until the next power loss                     |

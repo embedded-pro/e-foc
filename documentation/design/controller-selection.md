@@ -86,8 +86,8 @@ is listed under; there is no sharing of algorithm identifiers across loops.
 
 Each position algorithm declares whether it produces a speed reference or a current reference.
 A speed reference runs through the existing speed and current loops unchanged. A current
-reference bypasses the speed loop and feeds the current loop directly, because the state
-feedback laws already regulate speed as part of their own state vector; running them on top of
+reference bypasses the speed loop and feeds the current loop directly. The reason is that the state
+feedback laws already regulate speed as part of their own state vector. Running them on top of
 a speed loop would stack two regulators on the same state.
 
 The enumeration for each loop is fixed at build time. The default for all loops at first boot is PID.
@@ -97,7 +97,7 @@ The enumeration for each loop is fixed at build time. The default for all loops 
 ### Part B — Heap-Free Variant Storage
 
 All concrete controller instances for a given loop are held simultaneously in a single fixed-size
-discriminated union (a type-safe union that tracks which alternative is currently active). Only the
+discriminated union. The union is type-safe and tracks which alternative is currently active. Only the
 active alternative is live at any time; inactive alternatives exist as constructed but dormant objects.
 
 Switching the active algorithm constructs the new controller in place inside the union, destroying the
@@ -126,8 +126,8 @@ The per-sample computation runs at 20 kHz in the current-loop ISR. It must not u
 through a virtual base-class pointer, because this prevents the compiler from inlining and optimising
 the critical arithmetic.
 
-Dispatch is performed by visiting the discriminated union: the visitor examines the stored type tag
-and jumps directly to the concrete implementation, allowing the compiler to devirtualize the call
+Dispatch is performed by visiting the discriminated union. The visitor examines the stored type tag
+and jumps directly to the concrete implementation. This allows the compiler to devirtualize the call
 and inline the arithmetic. The resulting machine code is equivalent to a switch table with a
 direct function body inlined at each case, not a vtable indirection. There is no allocation and
 no heap touch in this path.
@@ -151,10 +151,13 @@ flowchart TD
 ### Part D — State Gating
 
 Algorithm selection is a configuration-time operation, not a run-time one. It is only permitted while
-the active mode's lifecycle state machine is **stopped** (Idle or Ready) and has no asynchronous
-work outstanding, including any write to the shared non-volatile memory. A request arriving while
-the motor is Enabled, Calibrating or in Fault, or while such a write is outstanding, is
-rejected immediately with *busy* without altering the active algorithm or any controller state.
+the active mode's lifecycle state machine:
+
+- is **stopped** (Idle or Ready)
+- has no asynchronous work outstanding, including any write to the shared non-volatile memory
+
+A request arriving while the motor is Enabled, Calibrating or in Fault, or while such a write is outstanding, is
+rejected immediately with *busy*. The request does not alter the active algorithm or any controller state.
 
 The guard is the same one that the control-mode selector applies to mode changes
 ([state-machine.md](state-machine.md) C2b). The cascades' own refusal while enabled remains
@@ -203,8 +206,8 @@ tractable:
 
 The state weights are shape knobs only. The position error weight anchors the cost at one. The
 remaining weights enter as ratios against it, clamped to $[10^{-3},\ 10^3]$. Anchoring matters
-for more than conditioning: if the position entry of $Q$ can reach zero the cost stops penalising
-the integrator state and the recursion has no stabilising solution to find.
+for more than conditioning. If the position entry of $Q$ can reach zero, the cost stops penalising
+the integrator state. The recursion then has no stabilising solution to find.
 
 These measures shrink but do not eliminate non-convergence. Therefore every Riccati design uses the
 fallible design step, which reports a failure, in preference to the design step that aborts. Feasibility
@@ -212,14 +215,14 @@ is part of the selection rule rather than an afterthought:
 
 - The selectability check runs the actual Riccati solve for LQR and LQI. A
   selection whose design does not converge returns *invalidParameters* and **leaves the
-  previously active algorithm running**, so the motor never ends up holding a silently dead loop.
+  previously active algorithm running**. The motor thus never ends up holding a silently dead loop.
 - A change of the position tunings is refused outright while the motor is enabled, with *busy*. A live
   motor is not a safe place to redesign the law that is holding it.
 - When disabled, a change of the position tunings is revalidated against the active algorithm. The
   change is rejected if the design fails, and the last accepted gains stay live.
 
 This is why a change of the position tunings returns a selection result, but a change of the current
-tunings returns none: the current loop derives its gains algebraically and cannot fail. A change of the
+tunings returns none. The current loop derives its gains algebraically and cannot fail. A change of the
 speed tunings returns a selection result as well. Its LQI law solves the same kind of Riccati equation.
 With the operator's weights (Part H), it does not converge everywhere in their range. At the lowest
 bandwidths, for instance, the effort weight makes the iteration too slow to settle. Thus the speed LQI
@@ -227,8 +230,8 @@ law uses the fallible design step, and its feasibility is part of the selectabil
 that it cannot be designed with is refused and leaves the running law as it was. Before the settings
 existed, the speed law aborted on a design that did not converge; it never stops the drive that way now.
 
-The general integral-augmented LQI design of the numerical toolbox is not used for the LQI position law,
-even though it now offers a fallible design step. It augments the plant with $C \cdot (-T_s)$, which
+The general integral-augmented LQI design of the numerical toolbox now offers a fallible design step. The LQI
+position law still does not use it. It augments the plant with $C \cdot (-T_s)$, which
 reintroduces the sample period into the integral row and undoes the time scaling above. At a 1 kHz
 outer rate, that row is three orders of magnitude smaller than the rest of the matrix and the solve
 stops converging. The augmentation is therefore written out explicitly in the scaled coordinates. There,
@@ -285,12 +288,12 @@ that loop. It is refused with *invalidParameters* when the algorithm cannot be d
 model it would run on (Part H). QueryAlgorithms reports the algorithm in force for every loop. A loop
 that the active mode does not run reports the identifier stored for it.
 
-Over CAN a selection is acknowledged once its identifier has been stored, so a client never reads
+Over CAN, a selection is acknowledged once its identifier has been stored. A client thus never reads
 "accepted" for a choice the next power cycle would lose.
 
 Each tuning setting is a numbered parameter that SetParameter writes and QueryParameter reads.
-The settings follow the same gate as a selection and are kept per loop, not per algorithm: the
-record of a loop is shared by all of its algorithms, each of which reads the fields it uses.
+The settings follow the same gate as a selection and are kept per loop, not per algorithm. All
+algorithms of a loop share the record of that loop, and each reads the fields it uses.
 
 ---
 
@@ -330,11 +333,11 @@ later bus changes.
 Deadbeat requires the tightest RLS convergence. Its back-EMF feedforward uses $\psi_f$ when it is
 known, and the voltage it leaves wrong is estimated and removed at the loop's bandwidth (REQ-CTL-001).
 
-Sliding-mode applies the same decoupling feedforward as Decoupled PID, and for the same reason: its
+Sliding-mode applies the same decoupling feedforward as Decoupled PID, and for the same reason. Its
 sliding surface is designed on the decoupled per-axis RL plant, so the cross-coupling and the
-back-EMF are disturbance to it. Sizing the switching gain to reject them outright is not viable —
-at 1000 rad/s electrical on a 0.01 Wb rotor the back-EMF alone is several times the authority the
-default gain commands, and raising the gain that far would put the boundary-layer ratio outside the
+back-EMF are disturbance to it. Sizing the switching gain to reject them outright is not viable.
+At 1000 rad/s electrical on a 0.01 Wb rotor, the back-EMF alone is several times the authority the
+default gain commands. Raising the gain that far would put the boundary-layer ratio outside the
 range in which the error map contracts. Feeding them forward leaves the switching term the residue
 it is sized for.
 
@@ -375,8 +378,8 @@ algorithm reads each field, as the code designs them.
 | Two-step variant | off       | Deadbeat                                                      |
 
 The sliding-mode error map inside the boundary layer contracts only while the switching gain stays
-below the boundary layer, so the ratio of the two is bounded by design. This is why the back-EMF is
-handled by feedforward rather than by a larger switching gain, and why a setting that would bring
+below the boundary layer. The ratio of the two is therefore bounded by design. This is why the back-EMF is
+handled by feedforward rather than by a larger switching gain. It is also why a setting that would bring
 the switching gain to the boundary layer is refused rather than stored.
 
 **Speed loop:**
@@ -400,18 +403,18 @@ the switching gain to the boundary layer is refused rather than stored.
 | Reference time constant | 53 ms     | Two-DOF                           |
 
 Two-DOF on both outer loops derives its feedback part from the same bandwidth as the corresponding
-PID law and adds only the reference pre-filter time constant on top. The position PID law has one
-knob, its bandwidth; its integral zero and reference weight are design constants
+PID law. It adds only the reference pre-filter time constant on top. The position PID law has one
+knob, its bandwidth. Its integral zero and reference weight are design constants
 ([position-loop-pid.md](../theory/position-loop-pid.md)), so the weights do not reach it.
 
 **Automatic bandwidth.** A bandwidth that the operator has not set is *automatic*: the firmware keeps
 deriving it. The current loop derives it from the PWM rate (a fifteenth of the switching frequency).
-The speed loop uses 100 rad/s, and the position loop 2π·3 rad/s. The automatic current loop is also held below the
-bandwidth at which its proportional gain, L·ω, turns the current-sensor noise the calibration measured
-into 0.08 V RMS of commanded voltage, and not below 1885 rad/s, ten times the 2π·30 Hz speed bandwidth
-of the tuning record's defaults and so 19 times the automatic speed loop (REQ-CTL-006). On
-the reference board, the sense chain carries 38.5 mA RMS of noise; at the PWM-derived 8378 rad/s that
-became 0.40 V of voltage noise and an audible hiss, which was gone at 0.08 V. A record that holds no
+The speed loop uses 100 rad/s, and the position loop 2π·3 rad/s. The automatic current loop is also limited by the
+current-sensor noise the calibration measured. It is held below the bandwidth at which its proportional gain, L·ω,
+turns that noise into 0.08 V RMS of commanded voltage. Its lower bound is 1885 rad/s, ten times the 2π·30 Hz speed
+bandwidth of the tuning record's defaults. That is 19 times the automatic speed loop (REQ-CTL-006). On
+the reference board, the sense chain carries 38.5 mA RMS of noise. At the PWM-derived 8378 rad/s, that
+became 0.40 V of voltage noise and an audible hiss. The hiss was gone at 0.08 V. A record that holds no
 noise measurement keeps the PWM-derived value.
 
 The calibration record holds no current-loop bandwidth: the automatic one is always the derivation
@@ -426,13 +429,13 @@ were never touched therefore runs exactly the loops it ran before the settings e
 
 **Persistence and application.** The settings of all three loops are one operator record, kept in
 the configuration record ([service-nvm.md](service-nvm.md)) and restored at boot. They are written into the
-running controllers whenever the active mode reaches Ready — after the selection restore of
-Part I — and whenever a setting or a motor parameter changes while it is stopped, because applying
-a motor model re-derives the tunings from it. An online recalibration ([online-recalibration.md](online-recalibration.md)) applies a motor
+running controllers whenever the active mode reaches Ready, after the selection restore of
+Part I. They are also written whenever a setting or a motor parameter changes while it is stopped. The reason is
+that applying a motor model re-derives the tunings from it. An online recalibration ([online-recalibration.md](online-recalibration.md)) applies a motor
 model the same way and writes them again after it, so the bandwidths it keeps are the operator's. Calibration in progress keeps the bandwidths its own
 identification steps need; the operator's record returns with the Ready that ends it. A setting
-is validated against the active algorithm before it is stored: a position LQR or LQI design that
-does not converge, or a switching gain at or above the boundary layer, is refused and leaves the
+is validated against the active algorithm before it is stored. A position LQR or LQI design that
+does not converge is refused. So is a switching gain at or above the boundary layer. Either refusal leaves the
 running law and the stored record as they were.
 
 #### Readiness Gate per Algorithm
@@ -475,8 +478,8 @@ configuration record, beside the default control mode. On boot:
 3. If invalid (first boot, CRC mismatch), the default (PID for all loops) is used and written.
 
 Restoration is driven by the state machine's transition into Ready, not by construction of the
-control mode: the motor model only reaches the loops when the calibration record has been applied,
-which happens asynchronously after the NVM read completes. Applying the persisted identifiers any
+control mode. The motor model only reaches the loops when the calibration record has been applied.
+This happens asynchronously after the NVM read completes. Applying the persisted identifiers any
 earlier would reject every model-dependent algorithm (deadbeat, decoupled PID, speed LQI, speed
 ADRC, position LQR, position LQI).
 
@@ -488,12 +491,12 @@ Two failure kinds are distinguished when a persisted identifier cannot be activa
 | Valid algorithm, not selectable yet (*invalidParameters*)   | Preserved, and retried on the next entry to Ready             |
 
 The non-volatile memory serves one write at a time and answers a concurrent one with *busy*. A
-selection's write that comes back busy is retried after a short delay until it lands; while it or
+selection's write that comes back busy is retried after a short delay until it lands. While it or
 any other write to that memory is outstanding, selections, mode changes and calibration are refused
 with *busy* ([state-machine.md](state-machine.md) C2a).
 
 The operator's tuning record is stored in the same configuration record, beside the identifiers,
-and is restored with them; Part H describes when it is applied.
+and is restored with them. Part H describes when it is applied.
 
 The persistence ensures that an operator who selects ADRC for the speed loop does not need to
 repeat the selection after every power cycle. The motor state machine will transition directly to
@@ -505,56 +508,56 @@ Ready with the previously selected algorithms active, ready to enable.
 
 ### Provided
 
-| Interface                         | Purpose                                                                             | Contract                                                                     |
-|-----------------------------------|-------------------------------------------------------------------------------------|------------------------------------------------------------------------------|
-| Current-loop selection            | Selects the active current-loop controller by identifier                            | *busy* unless stopped with no pending work (Part D). Immediate if *ok*.      |
-| Speed-loop selection              | Selects the active speed-loop controller by identifier                              | As above.                                                                    |
-| Position-loop selection           | Selects the active position-loop controller by identifier                           | As above.                                                                    |
-| Active current-loop algorithm     | Returns the identifier of the active current-loop algorithm                         | Always a valid identifier. Never blocks.                                     |
-| Active speed-loop algorithm       | Returns the identifier of the active speed-loop algorithm                           | As above.                                                                    |
-| Active position-loop algorithm    | Returns the identifier of the active position-loop algorithm                        | As above.                                                                    |
-| Current-loop computation          | Dispatches to the active current controller for one sample                          | At 20 kHz from the ISR. Zero heap. No virtual dispatch.                      |
-| Speed-loop computation            | Dispatches to the active speed controller for one sample                            | At 1 kHz from the low-priority handler.                                      |
-| Position-loop computation         | Dispatches to the active position controller for one sample                         | At 1 kHz from the low-priority handler.                                      |
-| Reconfiguration from parameters   | Applies the latest RLS snapshot to the active controllers, same algorithm           | Motor must be disabled.                                                      |
-| Loop tunings                      | Replaces the operator's tuning record of one loop                                   | Stopped, loop in the active mode, design feasible; applied and stored if *ok*. |
-| Effective loop tunings            | Returns a loop's record, with an automatic bandwidth resolved to the derived value  | Never blocks.                                                                |
+| Interface                       | Purpose                                                                            | Contract                                                                       |
+|---------------------------------|------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| Current-loop selection          | Selects the active current-loop controller by identifier                           | *busy* unless stopped with no pending work (Part D). Immediate if *ok*.        |
+| Speed-loop selection            | Selects the active speed-loop controller by identifier                             | As above.                                                                      |
+| Position-loop selection         | Selects the active position-loop controller by identifier                          | As above.                                                                      |
+| Active current-loop algorithm   | Returns the identifier of the active current-loop algorithm                        | Always a valid identifier. Never blocks.                                       |
+| Active speed-loop algorithm     | Returns the identifier of the active speed-loop algorithm                          | As above.                                                                      |
+| Active position-loop algorithm  | Returns the identifier of the active position-loop algorithm                       | As above.                                                                      |
+| Current-loop computation        | Dispatches to the active current controller for one sample                         | At 20 kHz from the ISR. Zero heap. No virtual dispatch.                        |
+| Speed-loop computation          | Dispatches to the active speed controller for one sample                           | At 1 kHz from the low-priority handler.                                        |
+| Position-loop computation       | Dispatches to the active position controller for one sample                        | At 1 kHz from the low-priority handler.                                        |
+| Reconfiguration from parameters | Applies the latest RLS snapshot to the active controllers, same algorithm          | Motor must be disabled.                                                        |
+| Loop tunings                    | Replaces the operator's tuning record of one loop                                  | Stopped, loop in the active mode, design feasible; applied and stored if *ok*. |
+| Effective loop tunings          | Returns a loop's record, with an automatic bandwidth resolved to the derived value | Never blocks.                                                                  |
 
 ### Required
 
-| Interface               | Purpose                                                              | Contract                                                                    |
-|-------------------------|----------------------------------------------------------------------|-----------------------------------------------------------------------------|
-| Motor enabled state     | Tells whether the motor state machine is in the Enabled state        | Enforces the selection guard. Callable from outside the ISR.                |
-| Electrical parameters   | Gives the RLS estimate of $R_s$, $L_s$, $\psi_f$, $V_{dc}$, pole pairs | Read during a selection and a reconfiguration.                            |
-| Mechanical parameters   | Gives the RLS estimate of $J$, $B_f$, $K_t$                          | Read during a selection and a reconfiguration of the speed and position loops. |
-| NVM write               | Persists the algorithm identifiers to non-volatile memory            | Once per successful selection. Must not block the hot path.                 |
-| NVM read                | Reads the persisted algorithm identifiers at boot                    | During boot initialization, before any Enable.                              |
+| Interface             | Purpose                                                                | Contract                                                                       |
+|-----------------------|------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| Motor enabled state   | Tells whether the motor state machine is in the Enabled state          | Enforces the selection guard. Callable from outside the ISR.                   |
+| Electrical parameters | Gives the RLS estimate of $R_s$, $L_s$, $\psi_f$, $V_{dc}$, pole pairs | Read during a selection and a reconfiguration.                                 |
+| Mechanical parameters | Gives the RLS estimate of $J$, $B_f$, $K_t$                            | Read during a selection and a reconfiguration of the speed and position loops. |
+| NVM write             | Persists the algorithm identifiers to non-volatile memory              | Once per successful selection. Must not block the hot path.                    |
+| NVM read              | Reads the persisted algorithm identifiers at boot                      | During boot initialization, before any Enable.                                 |
 
 ---
 
 ## Data Model
 
-| Entity                    | Field                    | Type / Unit       | Range                                            | Notes                                                            |
-|---------------------------|--------------------------|-------------------|--------------------------------------------------|------------------------------------------------------------------|
-| Current-loop algorithm    | identifier               | 8-bit unsigned    | PID, Decoupled PID, Deadbeat, Sliding-mode       | Selectable current-loop strategy                                 |
-| Speed-loop algorithm      | identifier               | 8-bit unsigned    | PID, LQI, ADRC, Two-DOF                          | Selectable speed-loop strategy                                   |
-| Position-loop algorithm   | identifier               | 8-bit unsigned    | PID, Cascade P, LQR, LQI, Two-DOF                | Selectable position-loop strategy                                |
-| Position output kind      | identifier               | 8-bit unsigned    | speed reference, current reference               | Declares whether a position law drives the speed or current loop |
-| Selection result          | identifier               | 8-bit unsigned    | ok, busy, invalidAlgorithm, invalidParameters    | Result of a selection                                            |
-| Motor model               | $R_s$                    | Ohm (float)       | > 0                                              | From electrical RLS                                              |
-| Motor model               | $L_s$                    | Henry (float)     | > 0                                              | From electrical RLS                                              |
-| Motor model               | $\psi_f$                 | Weber (float)     | > 0                                              | From alignment calibration                                       |
-| Motor model               | pole pairs               | 8-bit unsigned    | ≥ 1                                              | Motor constant                                                   |
-| Motor model               | $V_{dc}$                 | Volt (float)      | > 0                                              | Measured once at boot                                            |
-| Motor model               | current-loop rate        | Hertz (32-bit unsigned) | > 0                                        | $1/T_s^i$; required to discretize the plant for Deadbeat and SMC |
-| Motor model               | $J$                      | kg·m² (float)     | > 0                                              | From mechanical RLS                                              |
-| Motor model               | $B_f$                    | N·m·s/rad (float) | ≥ 0                                              | From mechanical RLS                                              |
-| Motor model               | $K_t$                    | N·m/A (float)     | > 0                                              | Derived from $\psi_f$ and pole pairs                             |
-| Configuration record      | current-loop algorithm   | 8-bit unsigned    | 0–255                                            | Validated on load; invalid → default (PID)                       |
-| Configuration record      | speed-loop algorithm     | 8-bit unsigned    | 0–255                                            | As above                                                         |
-| Configuration record      | position-loop algorithm  | 8-bit unsigned    | 0–255                                            | As above                                                         |
-| Calibration record        | speed-loop bandwidth     | rad/s (float)     | ≥ 0                                              | Not measured: mechanical identification writes a fixed 100 rad/s |
-| Configuration record      | loop tunings             | per knob          | [service-can.md](service-can.md) parameter table | Operator's settings; a bandwidth of 0 is automatic               |
+| Entity                  | Field                   | Type / Unit             | Range                                            | Notes                                                            |
+|-------------------------|-------------------------|-------------------------|--------------------------------------------------|------------------------------------------------------------------|
+| Current-loop algorithm  | identifier              | 8-bit unsigned          | PID, Decoupled PID, Deadbeat, Sliding-mode       | Selectable current-loop strategy                                 |
+| Speed-loop algorithm    | identifier              | 8-bit unsigned          | PID, LQI, ADRC, Two-DOF                          | Selectable speed-loop strategy                                   |
+| Position-loop algorithm | identifier              | 8-bit unsigned          | PID, Cascade P, LQR, LQI, Two-DOF                | Selectable position-loop strategy                                |
+| Position output kind    | identifier              | 8-bit unsigned          | speed reference, current reference               | Declares whether a position law drives the speed or current loop |
+| Selection result        | identifier              | 8-bit unsigned          | ok, busy, invalidAlgorithm, invalidParameters    | Result of a selection                                            |
+| Motor model             | $R_s$                   | Ohm (float)             | > 0                                              | From electrical RLS                                              |
+| Motor model             | $L_s$                   | Henry (float)           | > 0                                              | From electrical RLS                                              |
+| Motor model             | $\psi_f$                | Weber (float)           | > 0                                              | From alignment calibration                                       |
+| Motor model             | pole pairs              | 8-bit unsigned          | ≥ 1                                              | Motor constant                                                   |
+| Motor model             | $V_{dc}$                | Volt (float)            | > 0                                              | Measured once at boot                                            |
+| Motor model             | current-loop rate       | Hertz (32-bit unsigned) | > 0                                              | $1/T_s^i$; required to discretize the plant for Deadbeat and SMC |
+| Motor model             | $J$                     | kg·m² (float)           | > 0                                              | From mechanical RLS                                              |
+| Motor model             | $B_f$                   | N·m·s/rad (float)       | ≥ 0                                              | From mechanical RLS                                              |
+| Motor model             | $K_t$                   | N·m/A (float)           | > 0                                              | Derived from $\psi_f$ and pole pairs                             |
+| Configuration record    | current-loop algorithm  | 8-bit unsigned          | 0–255                                            | Validated on load; invalid → default (PID)                       |
+| Configuration record    | speed-loop algorithm    | 8-bit unsigned          | 0–255                                            | As above                                                         |
+| Configuration record    | position-loop algorithm | 8-bit unsigned          | 0–255                                            | As above                                                         |
+| Calibration record      | speed-loop bandwidth    | rad/s (float)           | ≥ 0                                              | Not measured: mechanical identification writes a fixed 100 rad/s |
+| Configuration record    | loop tunings            | per knob                | [service-can.md](service-can.md) parameter table | Operator's settings; a bandwidth of 0 is automatic               |
 
 ---
 
@@ -562,8 +565,8 @@ Ready with the previously selected algorithms active, ready to enable.
 
 The controller selection component has no states of its own — it is stateless except for the
 union's active alternative and the active algorithm identifiers. Its behaviour is governed entirely by the
-motor state machine's current state (stopped with no pending NVM work, vs. enabled, calibrating,
-faulted, or NVM-busy — Part D).
+motor state machine's current state (Part D). The state is either stopped with no pending NVM work, or enabled,
+calibrating, faulted, or NVM-busy.
 
 The sequence on a successful algorithm selection:
 
@@ -644,17 +647,17 @@ graph TD
 
 ## Constraints & Limitations
 
-| Constraint                     | Value / Description                                                                     |
-|--------------------------------|-----------------------------------------------------------------------------------------|
-| Heap allocation                | Zero. All controller instances reside in fixed-size, statically-allocated storage.      |
-| Hot-path virtual dispatch      | None. The visit dispatch inlines directly to concrete implementations.                  |
-| Selection while not stopped    | Rejected (Part D) with *busy*; no state change.                                         |
-| Current loop cycle overhead    | On the reference board, the visit dispatch adds ≤ 10 cycles versus a direct call.       |
+| Constraint                     | Value / Description                                                                       |
+|--------------------------------|-------------------------------------------------------------------------------------------|
+| Heap allocation                | Zero. All controller instances reside in fixed-size, statically-allocated storage.        |
+| Hot-path virtual dispatch      | None. The visit dispatch inlines directly to concrete implementations.                    |
+| Selection while not stopped    | Rejected (Part D) with *busy*; no state change.                                           |
+| Current loop cycle overhead    | On the reference board, the visit dispatch adds ≤ 10 cycles versus a direct call.         |
 | Maximum number of algorithms   | Fixed at build time by the union's list of alternatives. A new algorithm needs a rebuild. |
-| NVM write latency              | The NVM write occurs synchronously after selection; the motor stays disabled meanwhile. |
-| Parameter staleness            | Controllers keep the RLS snapshot of the selection time. See below.                     |
-| Mechanical parameters required | Speed and position algorithms need the mechanical RLS identification. See below.        |
-| DARE numerical stability       | An ill-conditioned plant returns *invalidParameters*. See below.                        |
+| NVM write latency              | The NVM write occurs synchronously after selection; the motor stays disabled meanwhile.   |
+| Parameter staleness            | Controllers keep the RLS snapshot of the selection time. See below.                       |
+| Mechanical parameters required | Speed and position algorithms need the mechanical RLS identification. See below.          |
+| DARE numerical stability       | An ill-conditioned plant returns *invalidParameters*. See below.                          |
 
 Controllers are configured with the RLS snapshot at selection time. They are not automatically updated
 if the RLS estimates change during operation.

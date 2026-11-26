@@ -68,8 +68,8 @@ The handler does not reset by software. The watchdog is no longer refreshed, so 
 target one early-warning period later. That reset shows as *watchdog* in the processor's own reset cause,
 with no record to write before the reset.
 
-This is the most graceful stop that is possible at this point. A torque ramp-down would need the event loop
-that has just been proven stuck, and the time left before the hardware reset is only one early-warning
+This is the most graceful stop that is possible at this point. A torque ramp-down would need the event loop,
+and the event loop is proven stuck. Also, the time left before the hardware reset is only one early-warning
 period.
 
 ### Part C — interrupt priority of the early warning
@@ -130,11 +130,11 @@ The bring-up application keeps one command:
   the hardware resets the target, and the target comes back reporting the reset cause as *watchdog*.
 
 The emulated target has no stall command. A SIL scenario describes the stall in the plant description,
-as it describes any other fault of the simulated world: the platform schedules the never-returning action
-the given time after boot, unless that boot followed a watchdog reset. The scenario then reads the reset
-cause over CAN (resetCause, contract 2.2) once the target answers again and expects *watchdog*. That
-runs the whole expiry path in continuous integration: the stalled action, the NMI early warning, the
-semihosting marker, the machine reset and the reset-cause report. The production firmware carries no
+as it describes any other fault of the simulated world. The platform schedules the never-returning action
+the given time after boot, unless that boot followed a watchdog reset. When the target answers again, the
+scenario reads the reset cause over CAN (resetCause, contract 2.2) and expects *watchdog*. That
+runs the whole expiry path in continuous integration. The path includes the stalled action, the NMI early
+warning, the semihosting marker, the machine reset and the reset-cause report. The production firmware carries no
 stall command either way.
 
 There is no command to enable or query the watchdog, because it has no state the application can change.
@@ -159,8 +159,8 @@ PWM-triggered sequence and trip the PWM fault input in hardware. A masked interr
 so the bridge stays protected. A lost trigger stops the comparators with the conversions, so nothing covers it.
 
 It is accepted as a residual risk. A supervisor was built and dropped as out of proportion to the
-probability (issue #482, closed as not planned): the control interrupt counted its completions, and an
-event-loop check every millisecond stopped the stage within 3 ms when the count stalled. Revisit it if the
+probability (issue #482, closed as not planned). In it, the control interrupt counted its completions. When
+the count stalled, an event-loop check every millisecond stopped the stage within 3 ms. Revisit it if the
 motor-controller application ever reconfigures the trigger path at run time, or if a stalled control
 interrupt is seen on a board.
 
@@ -278,10 +278,10 @@ A legitimate action must finish well inside *N·P*. Long work is already split a
 - NVM writes wait only word by word;
 - identification sequences run from timers and phase-current callbacks;
 - the staging slot and the status journal lie in the flash half the application does not execute from
-  ([bootloader.md](bootloader.md) Part A), so their sector erases, about 17 ms each and up to 40 ms with wear, never
-  hold the early-warning handler. Each erase with its read-back is one action of about 30 ms, and the
-  21 of a Begin Upgrade run back to back with nothing else between them, so the loop serves nothing
-  else for about 0.7 s, bounded at 1 s ([service-firmware-upgrade.md](service-firmware-upgrade.md)). An erase in the
+  ([bootloader.md](bootloader.md) Part A). Thus their sector erases never hold the early-warning handler.
+  A sector erase takes about 17 ms, and up to 40 ms with wear. Each erase with its read-back is one action
+  of about 30 ms. The 21 erases of a Begin Upgrade run back to back with nothing else between them. Thus the
+  loop serves nothing else for about 0.7 s, bounded at 1 s ([service-firmware-upgrade.md](service-firmware-upgrade.md)). An erase in the
   application's own half would hold the handler itself and reset the target at the next period,
   whatever the action split.
 
@@ -291,9 +291,9 @@ New work that could block for longer than the expiration timeout has to be split
 
 ### Bounded interrupts and actions
 
-A handler that is merely slow starves the early warning exactly as a hung one does, so the hardware resets the
+A handler that is merely slow starves the early warning exactly as a hung one does. Thus the hardware resets the
 target even though the handler would have returned. The phase-current interrupt of the hardware test terminal
-formatted a 100-line table while the phase-current interrupt was active; that took about as long as the hardware timeout
+formatted a 100-line table while the phase-current interrupt was active. That took about as long as the hardware timeout
 and reset the target on `pwm` followed by `duty`. The rule that follows:
 
 - Interrupt handlers collect data and schedule work; they never format, trace or wait.

@@ -30,8 +30,9 @@ date: 2026-11-26
 
 **Is responsible for:**
 - The serial command line of the bring-up application: parsing typed commands into bounded arguments,
-  answering each with a status and a message, and the hardware commands of that application (EEPROM,
-  ADC, CAN, watchdog, reset cause) that the hardware-in-the-loop scenarios drive
+  and answering each with a status and a message
+- The hardware commands of the bring-up application (EEPROM, ADC, CAN, watchdog, reset cause) that
+  the hardware-in-the-loop scenarios drive
 - The startup banner of both applications: firmware name, version and revision, build, compiler,
   target, system clock, supply voltage, reset cause, and the fault record a crash left behind
 - Ensuring all string handling uses bounded-size containers — no heap allocation at any point
@@ -42,26 +43,26 @@ date: 2026-11-26
 
 ### Part A — Where the command line lives
 
-| Application              | Command line | Serial output                                        | Commands                                              |
-|--------------------------|--------------|------------------------------------------------------|-------------------------------------------------------|
-| Bring-up application     | Yes          | Startup banner, command prompt, command answers      | Bring-up and hardware-in-the-loop hardware            |
-| Motor application        | No           | Startup banner and the trace output, nothing to type | None; CAN ([service-can.md](service-can.md))          |
+| Application          | Command line | Serial output                                        | Commands                                     |
+|----------------------|--------------|------------------------------------------------------|----------------------------------------------|
+| Bring-up application | Yes          | Startup banner, command prompt, command answers      | Bring-up and hardware-in-the-loop hardware   |
+| Motor application    | No           | Startup banner and the trace output, nothing to type | None; CAN ([service-can.md](service-can.md)) |
 
 The motor application once registered terminal commands of its own. Each has a CAN equivalent, and
 the scenarios and tools use CAN only ([integration-testing.md](../verification_and_validation/integration-testing.md)):
 
-| Former terminal command                                                           | Over CAN                                                                              |
-|-----------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
-| `select_current_algorithm`, `select_speed_algorithm`, `select_position_algorithm` | SelectAlgorithm                                                                       |
-| `active_algorithms`                                                               | QueryAlgorithms                                                                       |
-| `active_mode`                                                                     | SelectControlMode's response and the telemetry status                                 |
-| `set_torque`, `set_speed`, `set_position`                                         | SetTorqueSetpoint, SetSpeedSetpoint, SetPositionSetpoint                              |
-| `set_current_bandwidth`, `set_speed_bandwidth`, `set_position_bandwidth`          | The bandwidth parameters, with the same ranges and stopped-state policy               |
-| `set_flux_linkage`                                                                | The motor parameter *fluxLinkage*                                                     |
-| `apply_estimates`                                                                 | Recalibrate ([online-recalibration.md](online-recalibration.md))                      |
-| `estimate_status`                                                                 | The online estimates, 0x90–0x93                                                       |
-| `loop_stats`, `clear_stats`                                                       | The loop statistics, 0xA0–0xA7, and ClearDiagnostics                                  |
-| `can_stats`                                                                       | None: the motor application does not read the CAN error counters                      |
+| Former terminal command                                                           | Over CAN                                                                |
+|-----------------------------------------------------------------------------------|-------------------------------------------------------------------------|
+| `select_current_algorithm`, `select_speed_algorithm`, `select_position_algorithm` | SelectAlgorithm                                                         |
+| `active_algorithms`                                                               | QueryAlgorithms                                                         |
+| `active_mode`                                                                     | SelectControlMode's response and the telemetry status                   |
+| `set_torque`, `set_speed`, `set_position`                                         | SetTorqueSetpoint, SetSpeedSetpoint, SetPositionSetpoint                |
+| `set_current_bandwidth`, `set_speed_bandwidth`, `set_position_bandwidth`          | The bandwidth parameters, with the same ranges and stopped-state policy |
+| `set_flux_linkage`                                                                | The motor parameter *fluxLinkage*                                       |
+| `apply_estimates`                                                                 | Recalibrate ([online-recalibration.md](online-recalibration.md))        |
+| `estimate_status`                                                                 | The online estimates, 0x90–0x93                                         |
+| `loop_stats`, `clear_stats`                                                       | The loop statistics, 0xA0–0xA7, and ClearDiagnostics                    |
+| `can_stats`                                                                       | None: the motor application does not read the CAN error counters        |
 
 The motor application never registered the lifecycle commands (`calibrate`, `align`, `enable`, `disable`,
 `clear_fault`, `clear_cal`): it drives its state machines from CAN. They are gone with the command line.
@@ -120,17 +121,17 @@ registered commands in a fixed-size table; no dynamic registration table is used
 
 ### Provided
 
-| Interface          | Purpose                                                          | Contract                                                                 |
-|--------------------|------------------------------------------------------------------|--------------------------------------------------------------------------|
-| Startup banner     | Traces the banner of Part B                                      | Traced once, as the application starts                                   |
-| Bring-up terminal  | The bring-up application's terminal, tracing the banner when built | Transparent to the underlying terminal after the banner has been printed |
+| Interface         | Purpose                                                            | Contract                                                                 |
+|-------------------|--------------------------------------------------------------------|--------------------------------------------------------------------------|
+| Startup banner    | Traces the banner of Part B                                        | Traced once, as the application starts                                   |
+| Bring-up terminal | The bring-up application's terminal, tracing the banner when built | Transparent to the underlying terminal after the banner has been printed |
 
 ### Required
 
-| Interface             | Purpose                                                                                     | Contract                                                                                  |
-|-----------------------|---------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
-| Tracer                | The serial trace output the banner is written to                                            | Available before the application's other components are built                             |
-| Command terminal      | Receives and dispatches parsed command tokens; writes string responses to the serial output | Bring-up application only; connected to the serial driver before any command is added    |
+| Interface        | Purpose                                                                                     | Contract                                                                              |
+|------------------|---------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
+| Tracer           | The serial trace output the banner is written to                                            | Available before the application's other components are built                         |
+| Command terminal | Receives and dispatches parsed command tokens; writes string responses to the serial output | Bring-up application only; connected to the serial driver before any command is added |
 
 ---
 

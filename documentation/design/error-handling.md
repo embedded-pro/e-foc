@@ -55,10 +55,10 @@ that forgets it fails to build.
 
 On a target where several PWM generators drive the bridge, the cut disables the output of each powered generator. This
 drives every PWM output low and so turns all six gate signals off. It is a handful of instructions with no
-loop and no dependency on driver state. It touches no unpowered peripheral — an access to one would fault
+loop and no dependency on driver state. It touches no unpowered peripheral. An access to one would fault
 again, and a nested fault here is the lockup that this cut exists to prevent.
 
-On a target where one PWM generator with a main output enable drives the gate drivers, the cut disables that
+On some targets, one PWM generator with a main output enable drives the gate drivers. There, the cut disables that
 main output when the generator is powered. The idle level of each gate input is then low, so all six FETs are off.
 Like the cut above, it reads no driver state. On a target that does not drive a bridge yet, the cut is empty
 and says so: there is no PWM generator to name.
@@ -75,9 +75,9 @@ condition. The state machine then falls back to the retry budget alone, which is
 platforms before the query existed. An answer *clear* would claim a verification that the hardware never
 performed. On a board with no protection comparators, the cleared fault came from software anyway.
 
-The platforms answer as follows. One shared, host-tested decision serves them:
-*asserted* while a latched trip is set, or while a fresh bus-voltage reading is
-outside the board's overvoltage and undervoltage thresholds (a reading that is not a number counts as outside).
+The platforms answer as follows. One shared, host-tested decision serves them. The answer is
+*asserted* while a latched trip is set. It is also *asserted* while a fresh bus-voltage reading is
+outside the board's overvoltage and undervoltage thresholds. A reading that is not a number counts as outside.
 Otherwise the answer is *clear*. A latched trip answers without reading the bus.
 
 - **Comparator-based protection** — hardware comparators on the phase-current sampling chain watch the
@@ -89,9 +89,9 @@ Otherwise the answer is *clear*. A latched trip answers without reading the bus.
   total current. Two others watch the bus voltage against the overvoltage and the undervoltage threshold. Their
   outputs feed the power stage's fault input, which tristates every motor PWM output the instant a threshold is crossed.
   Their thresholds come from the motor board's characteristics. The total-current sense is biased to mid-scale, so the
-  overcurrent threshold is an offset above half scale. On the reference board it is 6.6 A, 80 % of the +8.25 A that a
-  5 A/V sense spans on a 3.3 V converter input. The bus voltage is sampled twice, once against the
-  overvoltage trip and once against an undervoltage trip at 18 V, because one conversion step feeds one comparator.
+  overcurrent threshold is an offset above half scale. On the reference board it is 6.6 A. This is 80 % of the +8.25 A that a
+  5 A/V sense spans on a 3.3 V converter input. One conversion step feeds one comparator. Thus the bus voltage is
+  sampled twice, once against the overvoltage trip and once against an undervoltage trip at 18 V.
   The board runs its gate driver and the controller from the same bus. A bus pulled down by the bridge would
   otherwise brown the controller out with nothing logged. At 18 V, the gate-drive supply is still in regulation, the
   bridge is cut and the fault reaches the state machine. The overcurrent comparator cannot see the bus current
@@ -100,7 +100,7 @@ Otherwise the answer is *clear*. A latched trip answers without reading the bus.
   at that same instant, where each winding's current crosses its own shunt. Thus the conversion interrupt checks
   each of them against the same 6.6 A before it hands them on. A sample beyond it cuts the outputs
   at once, the way the watchdog's early warning does. From then on, the platform withholds the samples and
-  refuses every duty command and start until the bridge is stopped, as the hardware fault latch would. It
+  refuses every duty command and start until the bridge is stopped. The hardware fault latch would do the same. It
   reports the over-current from the event loop, because the state machine's response stops the control loop.
   That response replaces the very sample callback that the interrupt is running. The check sees an over-current within
   one control period, 50 µs. In that time, the bench motor's winding current can rise by at most about 1.1 A from the
@@ -114,8 +114,8 @@ Otherwise the answer is *clear*. A latched trip answers without reading the bus.
   about 134 µs. This is acceptable because the query runs on the event dispatcher at fault-clear time and never from
   an interrupt. Both latches hold until the bridge is stopped, which the fault response does at once. After that, the
   live bus reading is the evidence for an over- or undervoltage. Over-current is not observable while stopped,
-  because no current flows through a disabled bridge. Monitoring the bus while the stage is stopped, so that a
-  condition that appears with no fault pending is seen, is out of scope here and belongs to #466.
+  because no current flows through a disabled bridge. Monitoring the bus while the stage is stopped would show a
+  condition that appears with no fault pending. That is out of scope here and belongs to #466.
 - **Software-check protection** — the same decision. Its checks run on the PWM-triggered samples, which stop with the bridge.
   Thus a protection latch covers the trip until the bridge is stopped. The software checks and the watchdog set it.
   A fresh bus-voltage reading against the same thresholds covers the rest. The reading runs in the event loop,
@@ -128,13 +128,13 @@ Otherwise the answer is *clear*. A latched trip answers without reading the bus.
 **Verification.** The per-sample over-current decision is shared by both hardware platforms and unit-tested on the host.
 The board-protection scenario of the integration tests covers the state machine's response to a board-protection fault
 through the emulated board protection. The trip paths on the boards are verified
-by review only, and no automated test is planned for them (#487): the comparators that drive the PWM fault input,
-the per-sample over-current cut and the software checks. Exercising them takes a dedicated rig that
-is out of scope here: a programmable supply driven above 58 V and below 18 V, a way to force a phase current above
-6.6 A, and a scope to bound the gate cut. The CAN-only bench ([integration-testing.md](../verification_and_validation/integration-testing.md), *Commands and Verdicts over CAN Only*) has none of these.
+by review only, and no automated test is planned for them (#487). These paths are the comparators that drive the PWM
+fault input, the per-sample over-current cut and the software checks. Exercising them takes a dedicated rig that
+is out of scope here. The rig needs a programmable supply driven above 58 V and below 18 V, and a way to force a
+phase current above 6.6 A. It also needs a scope to bound the gate cut. The CAN-only bench ([integration-testing.md](../verification_and_validation/integration-testing.md), *Commands and Verdicts over CAN Only*) has none of these.
 
-The capture routine then writes all eight words of the processor's exception stack frame (R0–R3, R12, LR, PC, xPSR) plus
-three processor fault status words (configurable-fault status, memory-management address, bus-fault address) into the persistent region. It also scans the stack
+The capture routine then writes all eight words of the processor's exception stack frame (R0–R3, R12, LR, PC, xPSR) into the
+persistent region. It adds three processor fault status words (configurable-fault status, memory-management address, bus-fault address). It also scans the stack
 above the exception frame. It records each word whose value falls within the code region as a probable
 return address; this is the backtrace. The scan is bounded to a fixed number of words, not run to
 the top of the stack. On a bus or memory-protection fault, the stack pointer itself can be the corrupt value. A read
@@ -148,7 +148,7 @@ After capture, the handler resets the processor with a system reset request.
 ### Assertion failures — the abort handler
 
 A failed assertion ends in the abort handler. EmIL's default abort handler stops at a breakpoint when a debugger is
-attached and otherwise spins forever, with the gate drivers still switching at the last duty cycles. The watchdog does
+attached. Otherwise it spins forever, with the gate drivers still switching at the last duty cycles. The watchdog does
 not cut them when the failure happens in an interrupt. The hung interrupt starves the early warning, so nothing cuts
 the stage before the hardware reset 25 to 50 ms later ([Watchdog Design](watchdog.md), Part C).
 
@@ -196,36 +196,38 @@ statistics are read over CAN (0xA0–0xA7), and ClearDiagnostics resets both set
 is left free-running. The platform reads it on entry to and exit from the application callback that executes inside
 the control interrupt; the difference is one measured execution. Unsigned subtraction makes the measurement correct
 across the counter's own wrap. The measured window covers the encoder read, the
-control law and the application of the duty cycles to the power stage — the work the cycle budget applies to. Hardware ISR entry/exit overhead
+control law and the application of the duty cycles to the power stage. The cycle budget applies to this work. Hardware ISR entry/exit overhead
 is excluded; REQ-PLT-004 reserves 25% of the control period for that overhead. The measurement is
 taken in the platform layer so it is consistent across targets. The emulated target has no cycle
 counter and reads a free-running timer of its instruction-counted clock instead
 ([software-in-the-loop.md](../verification_and_validation/software-in-the-loop.md), Part B3).
 
-From it the platform maintains the last, minimum, maximum and a filtered average duration, the
-execution count, and three failure counts: **overruns** (over the budget, margin gone, deadline
-still met), **deadline misses** (over the period itself), and **re-entries** (a conversion arriving
-while the previous interrupt had not returned — the same failure observed as it happens rather than
-inferred afterwards).
+From it the platform maintains the last, minimum, maximum and a filtered average duration, and the
+execution count. It also maintains three failure counts:
+
+- **overruns** (over the budget, margin gone, deadline still met);
+- **deadline misses** (over the period itself);
+- **re-entries** (a conversion arriving while the previous interrupt had not returned — the same failure
+  observed as it happens rather than inferred afterwards).
 
 An exception cannot preempt itself. Thus a flag set on entry and tested on the next entry
-never sees a re-entry: the late conversion waits as pending and runs after the return. The hardware
+never sees a re-entry. The late conversion waits as pending and runs after the return. The hardware
 platforms instead check, as the callback ends, whether the interrupt now running is pending again
 in the interrupt controller (an EmIL query). Both drivers clear their interrupt flag and
-pending state before the callback, so the pending state is set only by a conversion or transfer that completed
-during the callback.
+pending state before the callback. Thus only a conversion or transfer that completed during the callback sets
+the pending state.
 
 **CAN errors.** Every error class the controller reports is counted, not only the bus-off condition
 that raises a fault. On each platform, the monitored-bus layer of can-lite wraps the CAN driver and does the
 counting, so no platform's reporting path can omit it. This is what separates a bus with marginal termination from one that is unplugged.
 
 Both sets saturate rather than wrap. The cost on the control path is a pair of counter reads and
-about two dozen inlined instructions, under one percent of the 20 kHz period.
+about two dozen inlined instructions. This is under one percent of the 20 kHz period.
 
 ### Fault indication on the LEDs
 
-A drive in Fault shows its fault on the red board LED as a repeating group of flashes, two for over-current up to
-eight for a command timeout, or steadily for a fault without a code of its own. The green LED goes out. The
+A drive in Fault shows its fault on the red board LED as a repeating group of flashes. The group has two flashes
+for over-current, up to eight for a command timeout. A fault without a code of its own lights the LED steadily. The green LED goes out. The
 status LEDs service drives the indication from the event loop. It reads the same state and fault code that the CAN
 telemetry reports; see [Status LEDs](service-leds.md) for the code table.
 
@@ -243,27 +245,27 @@ telemetry reports; see [Status LEDs](service-leds.md) for the code table.
 
 ### Required
 
-| Interface                 | Purpose                                                   | Contract                                        |
-|---------------------------|-----------------------------------------------------------|-------------------------------------------------|
-| Persistent RAM region     | A RAM region for the fault snapshot that startup keeps    | Must be outside the zero-filled data            |
-| Processor fault exception | Deliver the hard fault exception to the handler entry     | Always enabled; not configurable                |
-| Hardware reset cause      | Provide the reset cause bits at boot                      | Read once; cleared after read                   |
+| Interface                 | Purpose                                                | Contract                             |
+|---------------------------|--------------------------------------------------------|--------------------------------------|
+| Persistent RAM region     | A RAM region for the fault snapshot that startup keeps | Must be outside the zero-filled data |
+| Processor fault exception | Deliver the hard fault exception to the handler entry  | Always enabled; not configurable     |
+| Hardware reset cause      | Provide the reset cause bits at boot                   | Read once; cleared after read        |
 
 ---
 
 ## Data Model
 
-| Entity         | Field                  | Type / Unit           | Range                                           | Notes                                       |
-|----------------|------------------------|-----------------------|-------------------------------------------------|---------------------------------------------|
-| Fault snapshot | validity sentinel      | 32-bit unsigned       | 0 or 0xDEADBEEF                                 | Written last to commit capture              |
-| Fault snapshot | R0–R3, R12, LR, PC, xPSR | 32-bit unsigned     | Any                                             | Processor exception stack frame words       |
-| Fault snapshot | fault status (3 words) | 32-bit unsigned       | Any                                             | Processor fault status                      |
-| Fault snapshot | backtrace (16 entries) | 32-bit unsigned array | Any                                             | Addresses within the code region on stack   |
-| Fault snapshot | backtrace count        | 32-bit unsigned       | 0–16                                            | Number of valid backtrace entries           |
-| Reset cause    | —                      | enumeration           | power-up, brown-out, software, hardware, watchdog | Processor-agnostic                        |
+| Entity         | Field                    | Type / Unit           | Range                                             | Notes                                     |
+|----------------|--------------------------|-----------------------|---------------------------------------------------|-------------------------------------------|
+| Fault snapshot | validity sentinel        | 32-bit unsigned       | 0 or 0xDEADBEEF                                   | Written last to commit capture            |
+| Fault snapshot | R0–R3, R12, LR, PC, xPSR | 32-bit unsigned       | Any                                               | Processor exception stack frame words     |
+| Fault snapshot | fault status (3 words)   | 32-bit unsigned       | Any                                               | Processor fault status                    |
+| Fault snapshot | backtrace (16 entries)   | 32-bit unsigned array | Any                                               | Addresses within the code region on stack |
+| Fault snapshot | backtrace count          | 32-bit unsigned       | 0–16                                              | Number of valid backtrace entries         |
+| Reset cause    | —                        | enumeration           | power-up, brown-out, software, hardware, watchdog | Processor-agnostic                        |
 
-The watchdog reset cause comes from the hardware reset cause bits alone. The watchdog never resets by software: on
-expiry it cuts the power stage and stops refreshing, and the hardware watchdog's own reset sets the watchdog bit.
+The watchdog reset cause comes from the hardware reset cause bits alone. The watchdog never resets by software. On
+expiry it cuts the power stage and stops refreshing. The hardware watchdog's own reset then sets the watchdog bit.
 No marker has to survive the reset on a processor. The emulated target has no reset cause bits, so it keeps a
 semihosting marker file instead. See [Watchdog Design](watchdog.md).
 
