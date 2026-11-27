@@ -84,8 +84,9 @@ translates each command the server decodes into the matching state machine call:
 - IdentifyElectrical → the bridge reserves an external calibration (state guard and Calibrating entry).
   It waits for standstill, measures and applies the current offsets, and runs the estimation. On success
   it completes the external calibration with the offsets in the data; this aligns the rotor and persists.
-  On failure it answers *invalidState*, *calibrationFailed* or *busy*. Every failure that leaves the
-  reservation in place releases the reservation, so the node returns to Ready or Idle. These failures are
+  On failure it answers *invalidState*, *calibrationFailed* or *busy* ([when busy](#commissioning-busy)).
+  Every failure that leaves the reservation in place releases the reservation, so the node returns to Ready
+  or Idle. These failures are
   a rotor that does not come to rest, a failed offset measurement and a poor R/L fit. A missing pole-pair
   estimate, or one that does not fit the calibration record's byte, is also such a failure, as is a
   rejected completion. An emergency stop or a fault can abandon a previous run: the reservation is gone and
@@ -144,11 +145,15 @@ translates each command the server decodes into the matching state machine call:
 The bridge forwards the settings commands (SelectAlgorithm, QueryAlgorithms, SetParameter, QueryParameter and
 ClearDiagnostics) to the settings bridge, which it owns. The settings bridge holds one outstanding setting at
 a time. Thus a settings write that arrives while another is being stored is answered *busy*, whichever message
-carried it. The bridge forwards the commissioning commands (Align, the identifications, Calibrate and
-ClearCalibration) to the commissioning bridge. Each of them answers *busy* while another command or a
-non-volatile write is outstanding. The start-up loads and stores are such writes. The bridge also owns the commissioning bridge, which holds the
-outstanding answer of each command. The bridge takes the platform it reads from as one argument: the inverter
-and encoder, the platform diagnostics, and the reset cause.
+carried it.
+
+<a id="commissioning-busy"></a>The bridge forwards the commissioning commands (Align, the identifications,
+Calibrate and ClearCalibration) to the commissioning bridge, which it owns. The commissioning bridge holds the
+outstanding answer of each command. Each commissioning command answers *busy* while another command or a
+non-volatile write is outstanding. The start-up loads and stores are such writes.
+
+The bridge takes the platform it reads from as one argument: the inverter and encoder, the platform
+diagnostics, and the reset cause.
 
 The bridge validates that the correct control mode is active before accepting a setpoint command. An out-of-range setpoint results in *invalidPayload*. A mode mismatch results in a category error, *modeMismatch*.
 
