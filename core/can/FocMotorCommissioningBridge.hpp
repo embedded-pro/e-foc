@@ -25,9 +25,9 @@ namespace can
         void IdentifyElectrical(const infra::Function<void()>& onDone);
         void Calibrate(const infra::Function<void(services::CanAckStatus)>& onDone);
         void ClearCalibration(const infra::Function<void(services::CanAckStatus)>& onDone);
+        bool MaintenanceOutstanding() const;
 
     private:
-        bool MaintenanceOutstanding() const;
         bool ReserveCalibration(uint8_t commandId);
         bool ElectricalIdentificationInProgress() const;
         void MeasureCurrentOffsets();
