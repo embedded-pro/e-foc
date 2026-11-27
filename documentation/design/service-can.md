@@ -70,9 +70,8 @@ translates each command the server decodes into the matching state machine call:
 - Start → asynchronous enable. The bridge sends the acknowledgement when the enable is decided. The decision
   comes at once, or after an offset refresh. The offset refresh runs at the first enable after power-up, a mode
   switch or a Fault ([state-machine.md](state-machine.md), Refreshing the current offsets at enable).
-  Success acknowledges; a refusal sends the matching error. A stopped drive (Idle or Ready) answers *busy*
-  while another command or a non-volatile write is outstanding ([when busy](#commissioning-busy)). In
-  Calibrating, Enabled, Stopping and Fault, Start keeps its state answer, *invalidState*.
+  Success acknowledges; a refusal sends the matching error. In Idle or Ready, Start can answer *busy*
+  ([when busy](#commissioning-busy)). In Calibrating, Enabled, Stopping and Fault, Start answers *invalidState*.
 - Stop → disable.
 - ClearFault → clear fault.
 - EmergencyStop → emergency stop.
@@ -151,8 +150,8 @@ carried it.
 
 <a id="commissioning-busy"></a>The bridge forwards the commissioning commands (Align, the identifications,
 Calibrate and ClearCalibration) to the commissioning bridge, which it owns. The commissioning bridge holds the
-outstanding answer of each command. Each commissioning command answers *busy* while another command or a
-non-volatile write is outstanding. The start-up loads and stores are such writes.
+outstanding answer of each command. Each commissioning command, and Start in Idle or Ready, answers *busy*
+while another command or a non-volatile write is outstanding. The start-up loads and stores are such writes.
 
 The bridge takes the platform it reads from as one argument: the inverter and encoder, the platform
 diagnostics, and the reset cause.
