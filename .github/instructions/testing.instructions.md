@@ -22,9 +22,7 @@ namespace
 
 TEST_F(TestClarkePark, forward_of_balanced_currents_at_zero_angle_gives_expected_d_and_q)
 {
-    // Arrange
-    // Act
-    // Assert
+    ...
 }
 ```
 
