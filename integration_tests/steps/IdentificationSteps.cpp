@@ -151,7 +151,7 @@ WHEN(R"(electrical identification is run)")
     auto& fixture = context.Get<Fixture>();
     auto& setup = context.Get<ScenarioSetup>();
 
-    ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focIdentifyElectricalId, {}, kIdentificationTimeout))
+    ASSERT_TRUE(fixture.SendCommissioningCommand(can::focIdentifyElectricalId, kIdentificationTimeout))
         << "Electrical identification did not complete successfully";
 
     ReadCalibrationRecord(fixture, setup.identified);
@@ -175,7 +175,7 @@ WHEN(R"(the full calibration is run)")
     auto& fixture = context.Get<Fixture>();
     auto& setup = context.Get<ScenarioSetup>();
 
-    ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focCalibrateId, {}, kIdentificationTimeout))
+    ASSERT_TRUE(fixture.SendCommissioningCommand(can::focCalibrateId, kIdentificationTimeout))
         << "The calibration did not complete";
 
     ReadCalibrationRecord(fixture, setup.identified);

@@ -39,7 +39,7 @@ namespace can
 
     void FocMotorCommissioningBridge::IdentifyElectrical(const infra::Function<void()>& onDone)
     {
-        if (ElectricalIdentificationInProgress())
+        if (ElectricalIdentificationInProgress() || MaintenanceOutstanding())
         {
             server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::busy);
             return;

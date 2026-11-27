@@ -1563,6 +1563,28 @@ TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_WhilePending_ReturnsBusy)
     EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
 }
 
+TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_WhileASettingIsBeingStored_IsBusy)
+{
+    ConstructFixture();
+    infra::Function<void(services::NvmStatus)> pendingSave;
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([&pendingSave](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
+            {
+                pendingSave = done;
+            }));
+    DispatchSetParameter(can::FocParameter::currentBoundaryLayer, 0.8f);
+    ResetCaptures();
+
+    DispatchCommand(can::focIdentifyElectricalId);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryErrorOriginCmd, can::focIdentifyElectricalId);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
+
+    pendingSave(services::NvmStatus::Ok);
+    ExecuteAllActions();
+}
+
 TEST_F(FocMotorCanBridgeTest, OnIdentifyElectrical_InEnabled_RejectsInvalidState)
 {
     ConstructFixtureInReady();

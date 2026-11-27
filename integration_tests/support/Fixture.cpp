@@ -151,6 +151,38 @@ namespace integration
         }
     }
 
+    bool Fixture::SendCommissioningCommand(uint8_t messageType, std::chrono::milliseconds timeout, std::chrono::milliseconds busyWindow)
+    {
+        const auto busyDeadline = std::chrono::steady_clock::now() + busyWindow;
+        while (true)
+        {
+            const auto mark = MarkCapture();
+            if (SendCanCommand(can::focMotorCategoryId, messageType, {}, timeout))
+                return true;
+
+            if (!AnsweredBusy(messageType, mark) || std::chrono::steady_clock::now() >= busyDeadline)
+                return false;
+
+            Pause(kBusyRetryInterval);
+        }
+    }
+
+    bool Fixture::AnsweredBusy(uint8_t messageType, CaptureMark from) const
+    {
+        const auto errorId = MakeId(services::CanPriority::response, can::focMotorCategoryId,
+            services::canCategoryErrorResponseMessageTypeId, serverNodeId.value_or(kAssumedServerNodeId));
+        const auto error = FindCapturedCanFrame(errorId, from);
+        return error.has_value() && error->size() == 2 && (*error)[0] == messageType && (*error)[1] == static_cast<uint8_t>(can::FocMotorCategoryError::busy);
+    }
+
+    void Fixture::Pause(std::chrono::milliseconds duration)
+    {
+        const auto neverSent = MakeId(services::CanPriority::heartbeat, services::canSystemCategoryId, services::canHeartbeatMessageTypeId, services::canBroadcastNodeId);
+        hal::Can::Message payload;
+        std::chrono::milliseconds elapsed{ 0 };
+        (void)WaitForCanFrame(neverSent, payload, duration, elapsed);
+    }
+
     void Fixture::RequestStatus()
     {
         const hal::Can::Id statusRequestId = MakeId(services::CanPriority::command,

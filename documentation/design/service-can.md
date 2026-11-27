@@ -2,9 +2,9 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.25.1
+version: 0.25.2
 component: can-service
-date: 2026-11-26
+date: 2026-11-27
 ---
 
 | Field     | Value                    |
@@ -12,9 +12,9 @@ date: 2026-11-26
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.25.1                   |
+| Version   | 0.25.2                   |
 | Component | can-service              |
-| Date      | 2026-11-26               |
+| Date      | 2026-11-27               |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -82,6 +82,8 @@ translates each command the server decodes into the matching state machine call:
   The N·m kind first converts with the torque constant of Part A (contract 2.21). Without a torque
   constant, the bridge refuses it with *invalidState*.
 - IdentifyElectrical → the bridge reserves an external calibration (state guard and Calibrating entry).
+  While another command or a non-volatile write is outstanding, it answers *busy*, as Calibrate does. The
+  start-up loads and stores are such writes.
   It waits for standstill, measures and applies the current offsets, and runs the estimation. On success
   it completes the external calibration with the offsets in the data; this aligns the rotor and persists.
   On failure it answers *invalidState*, *calibrationFailed* or *busy*. Every failure that leaves the

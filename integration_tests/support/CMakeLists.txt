@@ -49,3 +49,5 @@ target_link_libraries(e_foc.integration_tests.support PUBLIC
     GTest::gtest
     GTest::gmock
 )
+
+add_subdirectory(test)
