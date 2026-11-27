@@ -29,8 +29,7 @@ namespace integration
         bool SendCanCommand(uint8_t category, uint8_t messageType,
             const hal::Can::Message& payload = {},
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
-        // The target answers busy while a non-volatile write is outstanding, also for its start-up writes after
-        // the first heartbeat (integration-testing.md, "Provided to step definitions").
+        // The target answers busy during its start-up writes after the first heartbeat.
         static constexpr std::chrono::milliseconds kBusyRetryWindow{ 5000 };
         static constexpr std::chrono::milliseconds kBusyRetryInterval{ 20 };
 
