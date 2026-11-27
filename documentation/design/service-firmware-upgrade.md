@@ -2,9 +2,9 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.12
+version: 0.3.13
 component: "service-firmware-upgrade"
-date: 2026-11-26
+date: 2026-11-27
 ---
 
 | Field     | Value                     |
@@ -12,9 +12,9 @@ date: 2026-11-26
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.3.12                    |
+| Version   | 0.3.13                    |
 | Component | service-firmware-upgrade  |
-| Date      | 2026-11-26                |
+| Date      | 2026-11-27                |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -118,7 +118,7 @@ An accepted Begin first erases the status journal, which discards a pack that wa
 the entire staging slot, one sector per event-loop turn, and only then answers. Each sector is read back after its
 erase, a chunk per turn. A byte that does not read erased ends the download. The flash drivers report no error of
 their own, so the read-back is how the service sees a failed erase. The download therefore starts on a slot
-that is known to be erased: 16 sectors on the reference board, whatever the pack's size. The answer carries the
+that is known to be erased: 20 sectors on the reference board, whatever the pack's size. The answer carries the
 page size, the number of bytes the service collects before it programs them. The page size is 128 on the reference board
 and 256 on the emulated board (Part I).
 
@@ -232,7 +232,7 @@ them as the NVM design describes ([service-nvm.md](service-nvm.md), version chec
   one sector per event-loop turn and programs one page at a time. The watchdog's own 100 ms expiry is therefore
   never approached. Those turns follow each other with nothing else scheduled between them. From an accepted Begin to its
   answer, the node therefore sends nothing, its heartbeat included. This silence lasts 0.68 s on the reference
-  board for the 21 sectors with their read-back. The design bounds that silence at 1 s. This is one heartbeat interval
+  board for the 21 sectors, the journal's one and the staging slot's 20, with their read-back. The design bounds that silence at 1 s. This is one heartbeat interval
   and a third of the 3 s after which a client reports the node offline. The hardware apply scenario's `[METRIC]` line,
   Begin to answer, measures it.
 - **Real time.** The drive is stopped while a pack is received, so no power-stage output depends on the control interrupt
