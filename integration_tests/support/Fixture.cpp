@@ -325,7 +325,7 @@ namespace integration
 
     bool Fixture::EnableMotor(std::chrono::milliseconds timeout)
     {
-        if (!SendCanCommand(can::focMotorCategoryId, can::focStartId, {}, timeout))
+        if (!SendCommandWhenFree(can::focStartId, {}, timeout))
             return false;
         return WaitForMotorState(can::FocMotorState::running, timeout);
     }

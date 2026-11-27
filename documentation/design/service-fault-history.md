@@ -2,7 +2,7 @@
 title: "Service: Fault History"
 type: design
 status: draft
-version: 0.1.2
+version: 0.1.3
 component: service-fault-history
 date: 2026-11-27
 ---
@@ -12,7 +12,7 @@ date: 2026-11-27
 | Title     | Service: Fault History |
 | Type      | design                 |
 | Status    | draft                  |
-| Version   | 0.1.2                  |
+| Version   | 0.1.3                  |
 | Component | service-fault-history  |
 | Date      | 2026-11-27             |
 
@@ -79,9 +79,9 @@ oldest of eight records gives way to it.
 The eight records and the power-up count are stored as one image in a region of their own (`service-nvm.md`,
 Fault History Region). A store starts at most once a second; records captured meanwhile go out with the next
 store. Each load and store is bracketed as outstanding asynchronous work of the control-mode state machine
-(`state-machine.md`, C2a). A calibration or a configuration write is therefore refused for its duration. It does not
-collide with the store in the memory. Over CAN the refusal is *busy* (`service-can.md`). When the memory is busy
-with one of those, the store is retried every 10 ms. A store that does not read back is retried a second later.
+(`state-machine.md`, C2a). A start, a calibration or a configuration write is therefore refused for its
+duration. It does not collide with the store in the memory. Over CAN the refusal is *busy* (`service-can.md`).
+When the memory is busy with one of those, the store is retried every 10 ms. A store that does not read back is retried a second later.
 Each record carries its own check byte, so a store cut short by a power loss loses at most the records it was
 writing.
 
