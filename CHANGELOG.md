@@ -1,5 +1,53 @@
 # Changelog
 
+## [4.0.0](https://github.com/embedded-pro/e-foc/compare/v3.0.0...v4.0.0) (2026-11-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **position:** a position setpoint is no longer taken modulo one turn unless positionCircular is set, and the reported position counts turns.
+
+### Features
+
+* **position:** Multi-turn position, linear by default, with a circular mode ([#718](https://github.com/embedded-pro/e-foc/issues/718)) ([401d0c7](https://github.com/embedded-pro/e-foc/commit/401d0c7b6c40396922948ffc894f35f9e8c8c4c3))
+* **virtual_motor:** A virtual motor reads a text plant description ([#723](https://github.com/embedded-pro/e-foc/issues/723)) ([e4b2d84](https://github.com/embedded-pro/e-foc/commit/e4b2d84529f6b52506823a90e077f215db86af93))
+* **virtual_motor:** Compensate the shaft drive for the sender's lag ([#725](https://github.com/embedded-pro/e-foc/issues/725)) ([586f7c9](https://github.com/embedded-pro/e-foc/commit/586f7c9dd29029c556d88fe8ae34b7467a9ea228))
+* **virtual_motor:** Drive the shaft at a speed sent over the plant port ([#724](https://github.com/embedded-pro/e-foc/issues/724)) ([d71ea8e](https://github.com/embedded-pro/e-foc/commit/d71ea8e75d40aa6a3ba56ee75e783fb13a9033ae))
+
+
+### Bug Fixes
+
+* Answer busy to IdentifyElectrical during start-up writes ([#747](https://github.com/embedded-pro/e-foc/issues/747)) ([24f61dc](https://github.com/embedded-pro/e-foc/commit/24f61dca2a7a450ef81bac71b343c7358e7966d1))
+* Answer busy to Start while a write is outstanding ([#751](https://github.com/embedded-pro/e-foc/issues/751)) ([c69abb8](https://github.com/embedded-pro/e-foc/commit/c69abb80dc60baa41db8a79964d0eb00e8592e62))
+* Answer the staged version after the staged pack is read ([#753](https://github.com/embedded-pro/e-foc/issues/753)) ([68a17c1](https://github.com/embedded-pro/e-foc/commit/68a17c18c6470dde0ee6715558ce57947d902b08))
+* **virtual_motor:** Can-lite with the virtual hub fixes ([#720](https://github.com/embedded-pro/e-foc/issues/720)) ([0984eec](https://github.com/embedded-pro/e-foc/commit/0984eec6d65c987242e9e3c2ce22051c265137d4))
+
+
+### Documentation
+
+* Correct the staging-slot sector count and explain the record size ([#745](https://github.com/embedded-pro/e-foc/issues/745)) ([6a491b0](https://github.com/embedded-pro/e-foc/commit/6a491b0cda6f4eb961c689564e81a046d8f5b614))
+* Design documents describe the component, not code or hardware ([#742](https://github.com/embedded-pro/e-foc/issues/742)) ([5a902f0](https://github.com/embedded-pro/e-foc/commit/5a902f024794f1a351f88da5dae23735e125078c))
+* Shorten theory, verification and architecture sentences to ASD-STE100 limits ([#744](https://github.com/embedded-pro/e-foc/issues/744)) ([f967c53](https://github.com/embedded-pro/e-foc/commit/f967c530db89e40b886f9219895e77fc3708e7fa))
+* Two-sided PDF layout, verification_and_validation folder, documentation zip ([#730](https://github.com/embedded-pro/e-foc/issues/730)) ([42ee46f](https://github.com/embedded-pro/e-foc/commit/42ee46ff7370b5e3137ceaf6a7f4d46b8c6c3b6c))
+* **virtual_motor:** The shaft drive carries the load torque ([#728](https://github.com/embedded-pro/e-foc/issues/728)) ([d20a58f](https://github.com/embedded-pro/e-foc/commit/d20a58f457634df4b4796dd5a7d780852c971174))
+
+
+### Build System
+
+* Bump embedded-infra-lib and give the status journal two sectors ([#750](https://github.com/embedded-pro/e-foc/issues/750)) ([fc36d7d](https://github.com/embedded-pro/e-foc/commit/fc36d7dd373423702e8fee9231af098c10a339f5))
+* **deps:** Bump infra/can-lite from `e7de96e` to `cd2072e` ([#734](https://github.com/embedded-pro/e-foc/issues/734)) ([ed45f1b](https://github.com/embedded-pro/e-foc/commit/ed45f1b8e14511e23dc4849e6e6d0525295f8b61))
+* **deps:** Bump infra/e-foc-protocol from `0b16ccc` to `afb2d0e` ([#735](https://github.com/embedded-pro/e-foc/issues/735)) ([352b72e](https://github.com/embedded-pro/e-foc/commit/352b72ecf9d4534a7d90fb97bf42344e2e160fe0))
+* **deps:** Bump infra/hal/st from `079cb3b` to `f838aee` ([#732](https://github.com/embedded-pro/e-foc/issues/732)) ([c3faefb](https://github.com/embedded-pro/e-foc/commit/c3faefbeaded6bc3805eb9b9f3edb4bad13543ce))
+* **deps:** Bump infra/hal/st from `36ca0ac` to `079cb3b` ([#721](https://github.com/embedded-pro/e-foc/issues/721)) ([0948390](https://github.com/embedded-pro/e-foc/commit/09483908a0a1c335466fac2f812371bb10c0f002))
+* **deps:** Bump infra/hal/ti from `67f9a0b` to `15b5cdb` ([#733](https://github.com/embedded-pro/e-foc/issues/733)) ([46935f6](https://github.com/embedded-pro/e-foc/commit/46935f6124ae9c58262db69eccff8b64d5c951a7))
+* **deps:** Bump the patch-minor-action-updates group with 2 updates ([#722](https://github.com/embedded-pro/e-foc/issues/722)) ([279cd70](https://github.com/embedded-pro/e-foc/commit/279cd704746e36ab86712f85bc9a485510800f48))
+
+
+### Continuous Integration
+
+* **release:** Ship every EK-TM4C1294XL image inside the board's firmware archive ([#731](https://github.com/embedded-pro/e-foc/issues/731)) ([507391d](https://github.com/embedded-pro/e-foc/commit/507391dc73091dbddd09eb25353b33666695f09d))
+* Use embedded-devcontainer 7.5.1 ([#738](https://github.com/embedded-pro/e-foc/issues/738)) ([68b7ee4](https://github.com/embedded-pro/e-foc/commit/68b7ee4e3ade75fe0acf9538c1726569c3753855))
+
 ## [3.0.0](https://github.com/embedded-pro/e-foc/compare/v2.0.1...v3.0.0) (2026-11-12)
 
 
