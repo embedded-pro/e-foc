@@ -377,7 +377,7 @@ namespace can
 
     void FocMotorCanBridge::OnQueryParameter(FocParameter parameter, const infra::Function<void(FocParameterValue)>& onDone)
     {
-        onDone(settings.HeldValue(parameter));
+        settings.QueryParameter(parameter, onDone);
     }
 
     bool FocMotorCanBridge::SetpointRejected(uint8_t commandId, state_machine::ControlMode requiredMode,

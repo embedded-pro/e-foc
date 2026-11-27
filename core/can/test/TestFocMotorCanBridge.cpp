@@ -2659,7 +2659,10 @@ TEST_F(FocMotorCanBridgeTest, ClearCalibration_WhileASettingIsBeingStored_IsBusy
 TEST_F(FocMotorCanBridgeTest, QueryParameter_StagedVersion_ReportsThePackStagedForAnUpdate)
 {
     bridgeHasFirmwareUpgrade = true;
-    EXPECT_CALL(firmwareUpgradeMock, StagedVersion()).WillRepeatedly(Return(services::FirmwareVersion{ 2, 3, 4 }));
+    EXPECT_CALL(firmwareUpgradeMock, ReadStagedVersion(_)).WillRepeatedly([](const infra::Function<void(services::FirmwareVersion)>& onRead)
+        {
+            onRead(services::FirmwareVersion{ 2, 3, 4 });
+        });
     ConstructFixture();
     ResetCaptures();
 
@@ -2669,6 +2672,40 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_StagedVersion_ReportsThePackStagedF
     ExpectAnswered(3.0f, false);
     DispatchQueryParameter(can::FocParameter::stagedVersionPatch);
     ExpectAnswered(4.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_StagedVersion_IsAnsweredOnceTheStagedPackIsRead)
+{
+    bridgeHasFirmwareUpgrade = true;
+    infra::Function<void(services::FirmwareVersion)> stagedVersionRead;
+    EXPECT_CALL(firmwareUpgradeMock, ReadStagedVersion(_)).WillOnce([&stagedVersionRead](const infra::Function<void(services::FirmwareVersion)>& onRead)
+        {
+            stagedVersionRead = onRead;
+        });
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::stagedVersionMinor);
+    EXPECT_NE(lastSentMsgType, can::focParameterResponseId);
+
+    stagedVersionRead(services::FirmwareVersion{ 2, 3, 4 });
+    ExecuteAllActions();
+    ExpectAnswered(3.0f, false);
+}
+
+TEST_F(FocMotorCanBridgeTest, QueryParameter_StagedVersionWhileTheStagedPackIsRead_ReturnsBusy)
+{
+    bridgeHasFirmwareUpgrade = true;
+    EXPECT_CALL(firmwareUpgradeMock, ReadStagedVersion(_));
+    ConstructFixture();
+    ResetCaptures();
+
+    DispatchQueryParameter(can::FocParameter::stagedVersionMajor);
+    DispatchQueryParameter(can::FocParameter::stagedVersionMinor);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryErrorOriginCmd, can::focQueryParameterId);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
 }
 
 TEST_F(FocMotorCanBridgeTest, QueryParameter_TargetReached_ReportsTheReportedFlag)
