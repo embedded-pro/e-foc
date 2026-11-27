@@ -31,7 +31,7 @@ namespace
     constexpr uint32_t systemResetRequest{ 0x05FA0004u };
 
     std::array<uint8_t, 320 * 1024> stagingStorage;
-    std::array<uint8_t, 16 * 1024> journalStorage;
+    std::array<uint8_t, 32 * 1024> journalStorage;
 
     constexpr const char* watchdogResetMarkerPath = "watchdog_reset.bin";
     constexpr uint8_t watchdogResetMarker = 0x01;

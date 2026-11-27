@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.13
+version: 0.3.14
 component: "service-firmware-upgrade"
 date: 2026-11-27
 ---
@@ -12,7 +12,7 @@ date: 2026-11-27
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.3.13                    |
+| Version   | 0.3.14                    |
 | Component | service-firmware-upgrade  |
 | Date      | 2026-11-27                |
 
@@ -231,8 +231,9 @@ them as the NVM design describes ([service-nvm.md](service-nvm.md), version chec
   ([bootloader.md](bootloader.md) Part A). Their erases run there while the core keeps executing. The service erases
   one sector per event-loop turn and programs one page at a time. The watchdog's own 100 ms expiry is therefore
   never approached. Those turns follow each other with nothing else scheduled between them. From an accepted Begin to its
-  answer, the node therefore sends nothing, its heartbeat included. This silence lasts 0.68 s on the reference
-  board for the 21 sectors, the journal's one and the staging slot's 20, with their read-back. The design bounds that silence at 1 s. This is one heartbeat interval
+  answer, the node therefore sends nothing, its heartbeat included. The node erases 22 sectors, the journal's two and
+  the staging slot's 20, with their read-back. On the reference board 21 sectors took 0.68 s; the 22nd adds one
+  erase of about 17 ms. The design bounds that silence at 1 s. This is one heartbeat interval
   and a third of the 3 s after which a client reports the node offline. The hardware apply scenario's `[METRIC]` line,
   Begin to answer, measures it.
 - **Real time.** The drive is stopped while a pack is received, so no power-stage output depends on the control interrupt
