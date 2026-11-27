@@ -107,6 +107,8 @@ namespace
                     {
                         lastSentMsgType = services::ExtractCanMessageType(id.Get29BitId());
                         lastSentData = msg;
+                        if (lastSentMsgType == can::focParameterResponseId)
+                            ++parameterResponsesSent;
                         if (lastSentMsgType == can::focTelemetryStatusResponseId)
                             statusFrame = msg;
                         if (lastSentMsgType == services::canCategoryErrorResponseMessageTypeId && msg.size() >= 2)
@@ -275,6 +277,7 @@ namespace
         void ResetCaptures()
         {
             lastSentMsgType = 0;
+            parameterResponsesSent = 0;
             statusFrame.reset();
             categoryErrorSent = false;
             lastCategoryErrorOriginCmd = 0;
@@ -426,6 +429,7 @@ namespace
         std::optional<can::FocMotorCanBridge> bridge;
 
         uint8_t lastSentMsgType{};
+        std::size_t parameterResponsesSent{};
         hal::Can::Message lastSentData;
         std::optional<hal::Can::Message> statusFrame;
         bool categoryErrorSent{ false };
@@ -2754,7 +2758,16 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_StagedVersion_IsAnsweredOnceTheStag
 TEST_F(FocMotorCanBridgeTest, QueryParameter_StagedVersionWhileTheStagedPackIsRead_ReturnsBusy)
 {
     bridgeHasFirmwareUpgrade = true;
-    EXPECT_CALL(firmwareUpgradeMock, ReadStagedVersion(_));
+    infra::Function<void(services::FirmwareVersion)> stagedVersionRead;
+    EXPECT_CALL(firmwareUpgradeMock, ReadStagedVersion(_))
+        .WillOnce([&stagedVersionRead](const infra::Function<void(services::FirmwareVersion)>& onRead)
+            {
+                stagedVersionRead = onRead;
+            })
+        .WillOnce([](const infra::Function<void(services::FirmwareVersion)>& onRead)
+            {
+                onRead(services::FirmwareVersion{ 2, 3, 4 });
+            });
     ConstructFixture();
     ResetCaptures();
 
@@ -2764,6 +2777,23 @@ TEST_F(FocMotorCanBridgeTest, QueryParameter_StagedVersionWhileTheStagedPackIsRe
     EXPECT_TRUE(categoryErrorSent);
     EXPECT_EQ(lastCategoryErrorOriginCmd, can::focQueryParameterId);
     EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
+    EXPECT_EQ(parameterResponsesSent, 0u);
+    EXPECT_EQ(ackSpy.count, 1u);
+    ExpectAcknowledged(can::focQueryParameterId, services::CanAckStatus::categoryError);
+
+    ResetCaptures();
+    stagedVersionRead(services::FirmwareVersion{ 2, 3, 4 });
+    ExecuteAllActions();
+    ExpectAnswered(2.0f, false);
+    EXPECT_EQ(parameterResponsesSent, 1u);
+    EXPECT_FALSE(categoryErrorSent);
+    EXPECT_EQ(ackSpy.count, 1u);
+    ExpectAcknowledged(can::focQueryParameterId, services::CanAckStatus::success);
+
+    ResetCaptures();
+    DispatchQueryParameter(can::FocParameter::stagedVersionPatch);
+    ExpectAnswered(4.0f, false);
+    EXPECT_FALSE(categoryErrorSent);
 }
 
 TEST_F(FocMotorCanBridgeTest, QueryParameter_TargetReached_ReportsTheReportedFlag)

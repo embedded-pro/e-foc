@@ -260,7 +260,7 @@ which reports the kind of the board the build is for, from the board definitions
 The firmware answers the staged-version parameters (0xB5–0xB7) from the version the service holds staged.
 At start-up the service reads the staged pack's header back in the background. A staged-version query that
 arrives before this read ends is answered when it ends, never with zero for a staged pack. A second
-staged-version query while one waits is answered *busy*.
+staged-version query while one waits is answered *busy*. An abort while a query waits answers it with 0.0.0.
 Board kinds are numbers: 1 is the reference board, 2 and 3 further boards, emulated 5, unknown 0. Kind 4 was
 a board whose support was dropped, and is never reused.
 
