@@ -87,6 +87,7 @@ namespace can
         void ApplySpeedSetpoint(uint8_t commandId, foc::RadiansPerSecond value, const infra::Function<void()>& onDone);
         void ApplyPositionSetpoint(uint8_t commandId, foc::Radians value, const infra::Function<void()>& onDone);
         bool SetpointRejected(uint8_t commandId, state_machine::ControlMode requiredMode, bool withinRange);
+        bool StartWaitsForAsyncWork() const;
         void NotifyCommandAccepted();
 
         FocMotorCategoryServer& server;

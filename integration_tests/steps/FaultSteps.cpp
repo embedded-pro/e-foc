@@ -81,7 +81,7 @@ THEN(R"(the motor start shall be refused as a failed calibration)")
 WHEN(R"(the motor start command is issued)")
 {
     auto& fixture = context.Get<Fixture>();
-    ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focStartId))
+    ASSERT_TRUE(fixture.SendCommandWhenFree(can::focStartId, {}, std::chrono::seconds{ 5 }))
         << "Start command rejected";
 }
 

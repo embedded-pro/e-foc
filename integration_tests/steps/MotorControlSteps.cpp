@@ -23,7 +23,7 @@ namespace
 WHEN(R"(the motor is enabled)")
 {
     auto& fixture = context.Get<Fixture>();
-    ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focStartId))
+    ASSERT_TRUE(fixture.SendCommandWhenFree(can::focStartId, {}, std::chrono::seconds{ 5 }))
         << "Enable (focStartId) command rejected";
     const bool isReady = fixture.WaitForMotorState(can::FocMotorState::ready, std::chrono::milliseconds{ 500 });
     EXPECT_FALSE(isReady) << "Motor immediately returned to ready after enable (fault or emergency stop?)";
@@ -34,7 +34,7 @@ WHEN(R"(the motor is enabled)")
 WHEN(R"(the motor is started from the encoder index)")
 {
     auto& fixture = context.Get<Fixture>();
-    ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focStartId, {}, std::chrono::seconds{ 30 }))
+    ASSERT_TRUE(fixture.SendCommandWhenFree(can::focStartId, {}, std::chrono::seconds{ 30 }))
         << "Start refused: the index search did not restore the rotor reference";
     ASSERT_TRUE(fixture.WaitForMotorState(can::FocMotorState::running, std::chrono::seconds{ 5 }))
         << "Motor did not reach running state after the index search";
@@ -111,7 +111,7 @@ THEN(R"(the state machine shall be in the ready state within {int} ms)", (int ti
 THEN(R"(the motor shall refuse to enable)")
 {
     auto& fixture = context.Get<Fixture>();
-    fixture.SendCanCommand(can::focMotorCategoryId, can::focStartId);
+    (void)fixture.SendCommandWhenFree(can::focStartId, {}, std::chrono::seconds{ 5 });
     ASSERT_FALSE(fixture.WaitForMotorState(can::FocMotorState::running, std::chrono::seconds{ 2 }))
         << "Motor reached running state without a complete calibration";
 }

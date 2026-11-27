@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.25.3
+version: 0.25.4
 component: can-service
 date: 2026-11-27
 ---
@@ -12,7 +12,7 @@ date: 2026-11-27
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.25.3                   |
+| Version   | 0.25.4                   |
 | Component | can-service              |
 | Date      | 2026-11-27               |
 
@@ -70,7 +70,9 @@ translates each command the server decodes into the matching state machine call:
 - Start → asynchronous enable. The bridge sends the acknowledgement when the enable is decided. The decision
   comes at once, or after an offset refresh. The offset refresh runs at the first enable after power-up, a mode
   switch or a Fault ([state-machine.md](state-machine.md), Refreshing the current offsets at enable).
-  Success acknowledges; a refusal sends the matching error.
+  Success acknowledges; a refusal sends the matching error. A stopped drive (Idle or Ready) answers *busy*
+  while another command or a non-volatile write is outstanding ([when busy](#commissioning-busy)). In
+  Calibrating, Enabled, Stopping and Fault, Start keeps its state answer, *invalidState*.
 - Stop → disable.
 - ClearFault → clear fault.
 - EmergencyStop → emergency stop.

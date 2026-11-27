@@ -636,6 +636,64 @@ TEST_F(FocMotorCanBridgeTest, OnStart_InFault_AcksInvalidState)
     EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
 }
 
+TEST_F(FocMotorCanBridgeTest, OnStart_InReady_WhileASettingIsBeingStored_IsBusy)
+{
+    ConstructFixtureInReady();
+    infra::Function<void(services::NvmStatus)> pendingSave;
+    EXPECT_CALL(nvmMock, SaveConfig(_, _))
+        .WillOnce(Invoke([&pendingSave](const services::ConfigData&, infra::Function<void(services::NvmStatus)> done)
+            {
+                pendingSave = done;
+            }));
+    DispatchSetParameter(can::FocParameter::currentBoundaryLayer, 0.8f);
+    ResetCaptures();
+
+    DispatchCommand(can::focStartId);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryErrorOriginCmd, can::focStartId);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
+
+    pendingSave(services::NvmStatus::Ok);
+    ExecuteAllActions();
+}
+
+TEST_F(FocMotorCanBridgeTest, OnStart_WhileTheStartupLoadIsOutstanding_IsBusy)
+{
+    infra::Function<void(services::NvmStatus)> pendingLoad;
+    EXPECT_CALL(nvmMock, LoadCalibration(_, _))
+        .WillOnce(Invoke([&pendingLoad](services::CalibrationData& out, infra::Function<void(services::NvmStatus)> done)
+            {
+                out = services::CalibrationData{};
+                pendingLoad = done;
+            }));
+    Construct();
+    ResetCaptures();
+
+    DispatchCommand(can::focStartId);
+
+    EXPECT_TRUE(categoryErrorSent);
+    EXPECT_EQ(lastCategoryErrorOriginCmd, can::focStartId);
+    EXPECT_EQ(lastCategoryError, can::FocMotorCategoryError::busy);
+
+    pendingLoad(services::NvmStatus::InvalidData);
+    ExecuteAllActions();
+}
+
+TEST_F(FocMotorCanBridgeTest, OnStart_InCalibrating_AcksInvalidState)
+{
+    ConstructFixture();
+    EXPECT_CALL(electricalIdentMock, EstimateNumberOfPolePairs(_, _));
+    DispatchCommand(can::focCalibrateId);
+    ResetCaptures();
+
+    DispatchCommand(can::focStartId);
+
+    ASSERT_TRUE(ackSpy.last.has_value());
+    EXPECT_EQ(ackSpy.last->status, services::CanAckStatus::invalidState);
+    EXPECT_FALSE(categoryErrorSent);
+}
+
 TEST_F(FocMotorCanBridgeTest, OnSelectControlMode_Speed_EmitsResponseAndAcksSuccess)
 {
     ConstructFixture();

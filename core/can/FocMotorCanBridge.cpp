@@ -122,7 +122,7 @@ namespace can
 
     void FocMotorCanBridge::OnStart(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
-        if (pendingStartCallback != nullptr)
+        if (pendingStartCallback != nullptr || StartWaitsForAsyncWork())
         {
             server.SendCategoryError(can::focStartId, FocMotorCategoryError::busy);
             return;
@@ -137,6 +137,11 @@ namespace can
                     NotifyCommandAccepted();
                 ReportCommandOutcome(server, can::focStartId, result, callback);
             });
+    }
+
+    bool FocMotorCanBridge::StartWaitsForAsyncWork() const
+    {
+        return state_machine::IsStopped(controlMode.Drive().ActiveStateMachine().CurrentState()) && commissioning.MaintenanceOutstanding();
     }
 
     void FocMotorCanBridge::OnStop(const infra::Function<void(services::CanAckStatus)>& onDone)
