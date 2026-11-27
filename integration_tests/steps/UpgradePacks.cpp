@@ -95,7 +95,7 @@ namespace integration
     std::vector<uint8_t> JournalReading(application::UpgradePackStatus status)
     {
         std::vector<uint8_t> memory(emulatedJournalSize, 0xff);
-        services::SynchronousFlashMemory flash{ infra::MakeRange(memory), emulatedJournalSize };
+        services::SynchronousFlashMemory flash{ infra::MakeRange(memory), emulatedEraseUnit };
         bootloader::StatusJournal{ flash }.Record(status, 0);
         return memory;
     }
@@ -103,7 +103,7 @@ namespace integration
     std::pair<application::UpgradePackStatus, uint32_t> RecordedJournal()
     {
         auto memory = EmulatedBootloader().Journal();
-        services::SynchronousFlashMemory flash{ infra::MakeRange(memory), emulatedJournalSize };
+        services::SynchronousFlashMemory flash{ infra::MakeRange(memory), emulatedEraseUnit };
         const bootloader::StatusJournal journal{ flash };
         return { journal.Status(), journal.ErrorCode() };
     }

@@ -2,9 +2,9 @@
 title: "Bootloader"
 type: design
 status: draft
-version: 0.6.7
+version: 0.6.8
 component: "bootloader"
-date: 2026-11-26
+date: 2026-11-27
 ---
 
 | Field     | Value      |
@@ -12,9 +12,9 @@ date: 2026-11-26
 | Title     | Bootloader |
 | Type      | design     |
 | Status    | draft      |
-| Version   | 0.6.7      |
+| Version   | 0.6.8      |
 | Component | bootloader |
-| Date      | 2026-11-26 |
+| Date      | 2026-11-27 |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -63,15 +63,15 @@ its slot. The staging slot holds the pack the application received. It is in int
 image fit, and in external flash where they do not. The application and staging slots are 320 KB on every board, and
 no larger. The application erases all of the staging slot before a download starts
 ([service-firmware-upgrade.md](service-firmware-upgrade.md) Part B), so its size bounds that erase. The status journal
-(Part D) is the erase unit after the staging slot. The last 64 bytes of the application slot are the image
+(Part D) is the two erase units after the staging slot. The last 64 bytes of the application slot are the image
 descriptor (Part E).
 
-| Region           | Offset from the start of flash | Size           | Medium                                                                          |
-|------------------|--------------------------------|----------------|---------------------------------------------------------------------------------|
-| Bootloader       | `0x00000000`                   | 32 KB          | internal flash                                                                  |
-| Application slot | `0x00008000`                   | 320 KB         | internal flash; the last 64 bytes are the image descriptor                      |
-| Staging slot     | after the application slot     | 320 KB         | internal flash the application does not execute from, external flash, or a file |
-| Journal          | after the staging slot         | one erase unit | the medium of the staging slot                                                  |
+| Region           | Offset from the start of flash | Size            | Medium                                                                          |
+|------------------|--------------------------------|-----------------|---------------------------------------------------------------------------------|
+| Bootloader       | `0x00000000`                   | 32 KB           | internal flash                                                                  |
+| Application slot | `0x00008000`                   | 320 KB          | internal flash; the last 64 bytes are the image descriptor                      |
+| Staging slot     | after the application slot     | 320 KB          | internal flash the application does not execute from, external flash, or a file |
+| Journal          | after the staging slot         | two erase units | the medium of the staging slot                                                  |
 
 The reference board and the emulated board are built with this layout today. The emulated board has 4 MB
 of code RAM. On it, the staging slot is a semihosting staging file and the journal a semihosting journal file. The
@@ -93,9 +93,9 @@ On the reference board, whose staging slot is in internal flash:
 0x00080000 +==========================+  half boundary: the application executes below, erases above
            | staging slot     320 KB  |  pack received over CAN, erased while the application runs
 0x000D0000 +--------------------------+
-           | status journal    16 KB  |
-0x000D4000 +--------------------------+
-           | unused           176 KB  |
+           | status journal    32 KB  |
+0x000D8000 +--------------------------+
+           | unused           160 KB  |
 0x00100000 +--------------------------+
 ```
 
@@ -193,10 +193,14 @@ flowchart TD
 The embedded-infrastructure pack reader keeps an installation's progress in the pack's own status byte, which
 it clears bit by bit as the installation advances. Some internal flash cannot do that. It programs 64-bit
 or 128-bit units with ECC, and a programmed unit cannot be programmed again until its page is
-erased. Progress therefore goes to a journal instead, the erase unit after the staging slot, on every board:
+erased. Progress therefore goes to a journal instead, the two erase units after the staging slot, on every board:
 
-- Each entry is one 16-byte unit: a marker, the status and the error code. A new status is written into the
-  next erased unit; the current status is the last entry written, and an erased journal reads *empty*.
+- Each entry is one 16-byte unit: a marker, the status, a generation and the error code. A new status is written
+  into the next erased unit. The current status is the last valid entry, and an erased journal reads *empty*.
+- The journal is two regions of one erase unit each. A full region is erased only after the next entry is in the
+  other region. Thus a power loss at any step keeps a valid status. The library's bootloader
+  documentation gives the layout. With fewer than two erase units, the bootloader and the application stop at
+  start-up; the build asserts the size.
 - The application erases the journal when it accepts a new download.
   It writes *downloaded* when the pack passed its checks.
   It writes *ready to deploy* when the user applies it. The bootloader ignores *downloaded*, so a
@@ -208,8 +212,7 @@ erased. Progress therefore goes to a journal instead, the erase unit after the s
   The next status goes into the following erased unit, so no unit is ever programmed twice.
 - A status equal to the current one is not written again, so an installation interrupted any number of times
   adds no entries. With the application erasing the journal at every download, one download and installation
-  write at most five entries and the journal never fills. A full journal would be erased and restarted with the
-  status being recorded.
+  write at most five entries and a region never fills.
 
 ### Part E — image descriptor and the check at every reset
 

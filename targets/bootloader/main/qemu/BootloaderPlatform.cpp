@@ -12,7 +12,7 @@ namespace bootloader
         constexpr uint32_t eraseUnit = 16 * 1024;
 
         std::array<uint8_t, 320 * 1024> packStorage;
-        std::array<uint8_t, 16 * 1024> journalStorage;
+        std::array<uint8_t, 32 * 1024> journalStorage;
 
         infra::ByteRange Writable(infra::ConstByteRange region)
         {

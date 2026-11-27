@@ -13,7 +13,7 @@ __application_slot_end = 0x00058000;
 __staging_slot_start = 0x00080000;
 __staging_slot_end = 0x000D0000;
 __status_journal_start = 0x000D0000;
-__status_journal_end = 0x000D4000;
+__status_journal_end = 0x000D8000;
 __ram_start = 0x20000000;
 __ram_end = 0x20040000;
 
@@ -22,4 +22,5 @@ ASSERT(__staging_slot_end - __staging_slot_start == 320K, "the staging slot is n
 ASSERT(__application_slot_end <= __flash_upper_half_start, "the application slot reaches into the upper flash half")
 ASSERT(__staging_slot_start >= __flash_upper_half_start, "the staging slot is not entirely in the upper flash half, so its erases would stall the application and its watchdog")
 ASSERT(__status_journal_start >= __flash_upper_half_start, "the status journal is not in the upper flash half, so its erases would stall the application and its watchdog")
+ASSERT(__status_journal_end - __status_journal_start >= 2 * 16K, "the status journal has fewer than two 16 KB sectors, so the bootloader stops at start-up")
 ASSERT(__status_journal_end <= __flash_end, "the status journal lies beyond the flash")

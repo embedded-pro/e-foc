@@ -2,9 +2,9 @@
 title: "Software-in-the-Loop Design"
 type: design
 status: accepted
-version: 1.16.0
+version: 1.16.1
 component: "software-in-the-loop"
-date: 2026-11-09
+date: 2026-11-27
 ---
 
 | Field     | Value                       |
@@ -12,9 +12,9 @@ date: 2026-11-09
 | Title     | Software-in-the-Loop Design |
 | Type      | design                      |
 | Status    | accepted                    |
-| Version   | 1.16.0                      |
+| Version   | 1.16.1                      |
 | Component | software-in-the-loop        |
-| Date      | 2026-11-09                  |
+| Date      | 2026-11-27                  |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -1244,7 +1244,7 @@ application. The bootloader's own scenarios stage packs and read what it recorde
 | Bootloader       | `0x00000000`, 32 KB                       | the bootloader, its key slot in the last 80 bytes                       |
 | Application slot | `0x00008000`, 320 KB                      | the application, its header at 1 KB and its descriptor in the last 64 B |
 | Staging          | file `staging.bin` in the scenario folder | the pack, 320 KB at most                                                |
-| Journal          | file `journal.bin` in the scenario folder | the status journal, 16 KB                                               |
+| Journal          | file `journal.bin` in the scenario folder | the status journal, 32 KB: two 16 KB erase units                        |
 
 **What the emulator loads.** At every start the emulator loads the bootloader. Its key slot holds the
 public development key set (`bootloader.md` Part G). The emulator puts into the application slot what the
