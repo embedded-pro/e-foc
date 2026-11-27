@@ -175,10 +175,20 @@ THEN(R"(setting the {word} to {float} over CAN shall be refused as a design that
     const auto parameter = ParameterNamed(name);
     ASSERT_TRUE(parameter.has_value()) << "Unknown parameter: " << name;
 
-    const auto mark = fixture.MarkCapture();
-    EXPECT_FALSE(WriteParameter(fixture, *parameter, value)) << "The target accepted " << name << " = " << value;
+    const auto deadline = std::chrono::steady_clock::now() + Fixture::kBusyRetryWindow;
+    const auto busy = static_cast<uint8_t>(can::FocMotorCategoryError::busy);
+    bool accepted{ false };
+    std::optional<hal::Can::Message> error;
+    do
+    {
+        if (error.has_value())
+            std::this_thread::sleep_for(Fixture::kBusyRetryInterval);
+        const auto mark = fixture.MarkCapture();
+        accepted = WriteParameterOnce(fixture, *parameter, value);
+        error = CapturedResponse(fixture, services::canCategoryErrorResponseMessageTypeId, mark);
+    } while (!accepted && error.has_value() && error->size() == 2 && (*error)[1] == busy && std::chrono::steady_clock::now() < deadline);
 
-    const auto error = CapturedResponse(fixture, services::canCategoryErrorResponseMessageTypeId, mark);
+    EXPECT_FALSE(accepted) << "The target accepted " << name << " = " << value;
     ASSERT_TRUE(error.has_value() && error->size() == 2) << "The target sent no category error";
     EXPECT_EQ((*error)[0], can::focSetParameterId);
     EXPECT_EQ((*error)[1], static_cast<uint8_t>(can::FocMotorCategoryError::invalidParameters));

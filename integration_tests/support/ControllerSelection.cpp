@@ -47,6 +47,6 @@ namespace integration
         hal::Can::Message payload;
         payload.push_back(static_cast<uint8_t>(loop));
         payload.push_back(algorithm);
-        return fixture.SendCanCommand(can::focMotorCategoryId, can::focSelectAlgorithmId, payload, kSelectionTimeout);
+        return fixture.SendCommandWhenFree(can::focSelectAlgorithmId, payload, kSelectionTimeout);
     }
 }

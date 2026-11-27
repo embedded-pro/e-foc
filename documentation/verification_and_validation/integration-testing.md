@@ -2,9 +2,9 @@
 title: "Integration Testing Design"
 type: design
 status: accepted
-version: 1.8.0
+version: 1.8.2
 component: integration-testing
-date: 2026-11-10
+date: 2026-11-27
 ---
 
 | Field     | Value                      |
@@ -12,9 +12,9 @@ date: 2026-11-10
 | Title     | Integration Testing Design |
 | Type      | design                     |
 | Status    | accepted                   |
-| Version   | 1.8.0                      |
+| Version   | 1.8.2                      |
 | Component | integration-testing        |
-| Date      | 2026-11-10                 |
+| Date      | 2026-11-27                 |
 
 > **Note — Design-level document**: This document describes *how the integration tests are
 > structured*. It expands on the architecture by specifying component responsibilities, data flows,
@@ -201,6 +201,14 @@ Thus the suite finds a target as soon as its CAN server is up rather than a hear
 later. It sends one at most once a second. A request a silent target cannot acknowledge stays in the bus adapter. The
 adapter delivers such requests in a burst when the target comes back. A burst of them filled the
 target's send queue ahead of the first command's acknowledgement.
+
+The target answers its first heartbeat before its start-up loads and stores end. On the emulated target they
+end about 25 ms of target time after the start. In that time the target answers *busy* to these commands:
+alignment, electrical identification, calibration, calibration clear, mode selection, algorithm selection and a
+parameter write. The transport therefore sends such a command again while it is answered *busy*, every 20 ms,
+for up to 5 s. It never repeats any other refusal. A step that expects *busy* sends its command once. The
+firmware-upgrade steps send Begin Upgrade and Activate again on *busy* only while the drive is stopped. An enabled
+drive answers them *busy* by design.
 
 ### Required from the system under test
 

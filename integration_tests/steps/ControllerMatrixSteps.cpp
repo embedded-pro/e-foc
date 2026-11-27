@@ -63,14 +63,14 @@ GIVEN(R"(the motor boots in {word} mode)", (std::string mode))
 WHEN(R"(the rotor is aligned)")
 {
     auto& fixture = context.Get<Fixture>();
-    ASSERT_TRUE(fixture.SendCanCommand(can::focMotorCategoryId, can::focAlignId, {}, std::chrono::seconds{ 30 }))
+    ASSERT_TRUE(fixture.SendCommandWhenFree(can::focAlignId, {}, std::chrono::seconds{ 30 }))
         << "Align command rejected";
 }
 
 WHEN(R"(the rotor alignment is attempted)")
 {
     auto& fixture = context.Get<Fixture>();
-    fixture.SendCanCommand(can::focMotorCategoryId, can::focAlignId, {}, std::chrono::seconds{ 30 });
+    fixture.SendCommandWhenFree(can::focAlignId, {}, std::chrono::seconds{ 30 });
 }
 
 THEN(R"(the {word} loop shall be running the {word} algorithm)", (std::string loopName, std::string algorithmName))

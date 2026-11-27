@@ -29,6 +29,12 @@ namespace integration
         bool SendCanCommand(uint8_t category, uint8_t messageType,
             const hal::Can::Message& payload = {},
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
+        // The target answers busy during its start-up writes after the first heartbeat.
+        static constexpr std::chrono::milliseconds kBusyRetryWindow{ 5000 };
+        static constexpr std::chrono::milliseconds kBusyRetryInterval{ 20 };
+
+        bool SendCommandWhenFree(uint8_t messageType, const hal::Can::Message& payload, std::chrono::milliseconds timeout,
+            std::chrono::milliseconds busyWindow = kBusyRetryWindow);
         bool WaitForMotorState(can::FocMotorState expectedState,
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });
         bool WaitForMotorState(std::initializer_list<can::FocMotorState> expectedStates,
@@ -84,6 +90,8 @@ namespace integration
         std::optional<TelemetrySample> RequestTelemetry(std::chrono::milliseconds timeout);
         void RequestStatus();
         std::optional<uint16_t> FindHeartbeatNode(CaptureMark from) const;
+        bool AnsweredBusy(uint8_t messageType, CaptureMark from) const;
+        void Pause(std::chrono::milliseconds duration);
 
         TargetInteractor& interactor;
         std::chrono::steady_clock::time_point canReference{};

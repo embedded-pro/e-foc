@@ -92,11 +92,41 @@ namespace
         download.blocksSent = 0;
     }
 
+    bool DriveStopped(Fixture& fixture)
+    {
+        const auto state = fixture.ReadMotorState();
+        return state == can::FocMotorState::idle || state == can::FocMotorState::ready || state == can::FocMotorState::partialCalibration;
+    }
+
+    // A stopped drive answers busy only while a non-volatile write is outstanding, as just after start-up.
+    template<class Send, class IsBusy>
+    auto SendAgainWhileStoppedAndBusy(Fixture& fixture, Send send, IsBusy isBusy)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + Fixture::kBusyRetryWindow;
+        auto answer = send();
+        while (answer.has_value() && isBusy(*answer) && std::chrono::steady_clock::now() < deadline && DriveStopped(fixture))
+        {
+            std::this_thread::sleep_for(Fixture::kBusyRetryInterval);
+            answer = send();
+        }
+        return answer;
+    }
+
     void Begin(Fixture& fixture, FirmwareDownload& download)
     {
-        const auto sent = std::chrono::steady_clock::now();
-        const auto answer = FirmwareUpgradeClient{ fixture }.Begin(static_cast<uint32_t>(download.pack.size()));
-        const auto answered = std::chrono::duration<double>{ std::chrono::steady_clock::now() - sent }.count();
+        double answered{ 0.0 };
+        const auto answer = SendAgainWhileStoppedAndBusy(
+            fixture, [&fixture, &download, &answered]()
+            {
+                const auto sent = std::chrono::steady_clock::now();
+                const auto attempt = FirmwareUpgradeClient{ fixture }.Begin(static_cast<uint32_t>(download.pack.size()));
+                answered = std::chrono::duration<double>{ std::chrono::steady_clock::now() - sent }.count();
+                return attempt;
+            },
+            [](const FirmwareUpgradeClient::BeginAnswer& attempt)
+            {
+                return attempt.error == services::FwuError::busy;
+            });
         ASSERT_TRUE(answer.has_value()) << "Begin Upgrade was not answered";
         std::printf("[METRIC] firmware upgrade begin_to_answer_s=%.2f\n", answered);
         EXPECT_LE(answered, beginAnswerBound.count()) << "Begin Upgrade kept the controller silent for too long";
@@ -201,7 +231,16 @@ WHEN(R"(the first {int} blocks are sent)", (int count))
 WHEN(R"(Activate is sent)")
 {
     auto& download = context.Get<ScenarioSetup>().download;
-    const auto answer = FirmwareUpgradeClient{ context.Get<Fixture>() }.Activate();
+    auto& fixture = context.Get<Fixture>();
+    const auto answer = SendAgainWhileStoppedAndBusy(
+        fixture, [&fixture]()
+        {
+            return FirmwareUpgradeClient{ fixture }.Activate();
+        },
+        [](services::FwuError attempt)
+        {
+            return attempt == services::FwuError::busy;
+        });
     download.activatedAt = std::chrono::steady_clock::now();
     ASSERT_TRUE(answer.has_value()) << "Activate was not answered";
     download.activateAnswer = static_cast<uint8_t>(*answer);
@@ -308,7 +347,7 @@ THEN(R"(setting the telemetry rate to {int} Hz is refused as busy)", (int rateHz
     auto& fixture = context.Get<Fixture>();
 
     const auto mark = fixture.MarkCapture();
-    EXPECT_FALSE(WriteParameter(fixture, can::FocParameter::telemetryRate, static_cast<float>(rateHz))) << "The telemetry rate was accepted";
+    EXPECT_FALSE(WriteParameterOnce(fixture, can::FocParameter::telemetryRate, static_cast<float>(rateHz))) << "The telemetry rate was accepted";
 
     const auto error = CapturedResponse(fixture, services::canCategoryErrorResponseMessageTypeId, mark);
     ASSERT_TRUE(error.has_value() && error->size() == 2) << "The drive sent no category error";

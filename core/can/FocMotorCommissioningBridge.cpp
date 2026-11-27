@@ -19,7 +19,7 @@ namespace can
 
     void FocMotorCommissioningBridge::Align(const infra::Function<void(services::CanAckStatus)>& onDone)
     {
-        if (pendingAlignDoneCallback != nullptr)
+        if (pendingAlignDoneCallback != nullptr || MaintenanceOutstanding())
         {
             server.SendCategoryError(can::focAlignId, FocMotorCategoryError::busy);
             return;
@@ -39,7 +39,7 @@ namespace can
 
     void FocMotorCommissioningBridge::IdentifyElectrical(const infra::Function<void()>& onDone)
     {
-        if (ElectricalIdentificationInProgress())
+        if (ElectricalIdentificationInProgress() || MaintenanceOutstanding())
         {
             server.SendCategoryError(can::focIdentifyElectricalId, FocMotorCategoryError::busy);
             return;
