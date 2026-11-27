@@ -2,9 +2,9 @@
 title: "Service: Non-Volatile Memory"
 type: design
 status: draft
-version: 0.17.1
+version: 0.17.2
 component: service-nvm
-date: 2026-11-26
+date: 2026-11-27
 ---
 
 | Field     | Value                        |
@@ -12,9 +12,9 @@ date: 2026-11-26
 | Title     | Service: Non-Volatile Memory |
 | Type      | design                       |
 | Status    | draft                        |
-| Version   | 0.17.1                       |
+| Version   | 0.17.2                       |
 | Component | service-nvm                  |
-| Date      | 2026-11-26                   |
+| Date      | 2026-11-27                   |
 
 > **IMPORTANT — Implementation-blind document**: This document describes *behavior, structure, and
 > responsibilities* WITHOUT referencing code. **No code blocks using programming languages (C++, C,
@@ -71,7 +71,8 @@ Version 6 also widened the current noise to two bytes, so a noise above 255 mA i
 took the data from 112 to 100 bytes. A record written by an earlier firmware therefore reads as invalid, and the
 motor has to be calibrated again. Version 5's encoder index angle (`service-index-search.md`) had taken it from 108
 to 112 bytes. Version 4's cogging map (`service-cogging-compensation.md`) had taken it from 56 to 108. A record without an index angle
-holds a NaN there; the 109-byte record fits the 128-byte calibration region.
+holds a NaN there. With its 9-byte header (magic, version and checksum), the 109-byte record fits the 128-byte
+calibration region.
 
 The configuration record's layout is at version 17. The circular-positioning toggle (`foc-position.md`, Multi-Turn
 Position) took its data from 188 to 192 bytes: one byte for the toggle and three reserved. A record written at
