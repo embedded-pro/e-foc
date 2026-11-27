@@ -10,7 +10,9 @@ namespace integration
 {
     std::optional<hal::Can::Message> CapturedResponse(Fixture& fixture, uint8_t messageType, Fixture::CaptureMark mark);
     std::optional<can::FocParameter> ParameterNamed(const std::string& name);
+    // Sends the write again while the target answers busy; WriteParameterOnce sends it once.
     bool WriteParameter(Fixture& fixture, can::FocParameter parameter, float value);
+    bool WriteParameterOnce(Fixture& fixture, can::FocParameter parameter, float value);
     std::optional<can::FocParameterValue> ReadParameter(Fixture& fixture, can::FocParameter parameter);
     std::optional<float> ReadParameterValue(Fixture& fixture, can::FocParameter parameter);
     std::optional<hal::Can::Message> ReadAlgorithms(Fixture& fixture);

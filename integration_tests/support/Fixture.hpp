@@ -33,7 +33,7 @@ namespace integration
         static constexpr std::chrono::milliseconds kBusyRetryWindow{ 5000 };
         static constexpr std::chrono::milliseconds kBusyRetryInterval{ 20 };
 
-        bool SendCommissioningCommand(uint8_t messageType, std::chrono::milliseconds timeout,
+        bool SendCommandWhenFree(uint8_t messageType, const hal::Can::Message& payload, std::chrono::milliseconds timeout,
             std::chrono::milliseconds busyWindow = kBusyRetryWindow);
         bool WaitForMotorState(can::FocMotorState expectedState,
             std::chrono::milliseconds timeout = std::chrono::milliseconds{ 5000 });

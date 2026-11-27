@@ -2,7 +2,7 @@
 title: "CAN Service Layer Design"
 type: design
 status: draft
-version: 0.25.2
+version: 0.25.3
 component: can-service
 date: 2026-11-27
 ---
@@ -12,7 +12,7 @@ date: 2026-11-27
 | Title     | CAN Service Layer Design |
 | Type      | design                   |
 | Status    | draft                    |
-| Version   | 0.25.2                   |
+| Version   | 0.25.3                   |
 | Component | can-service              |
 | Date      | 2026-11-27               |
 
@@ -82,8 +82,6 @@ translates each command the server decodes into the matching state machine call:
   The N·m kind first converts with the torque constant of Part A (contract 2.21). Without a torque
   constant, the bridge refuses it with *invalidState*.
 - IdentifyElectrical → the bridge reserves an external calibration (state guard and Calibrating entry).
-  While another command or a non-volatile write is outstanding, it answers *busy*, as Calibrate does. The
-  start-up loads and stores are such writes.
   It waits for standstill, measures and applies the current offsets, and runs the estimation. On success
   it completes the external calibration with the offsets in the data; this aligns the rotor and persists.
   On failure it answers *invalidState*, *calibrationFailed* or *busy*. Every failure that leaves the
@@ -147,7 +145,8 @@ The bridge forwards the settings commands (SelectAlgorithm, QueryAlgorithms, Set
 ClearDiagnostics) to the settings bridge, which it owns. The settings bridge holds one outstanding setting at
 a time. Thus a settings write that arrives while another is being stored is answered *busy*, whichever message
 carried it. The bridge forwards the commissioning commands (Align, the identifications, Calibrate and
-ClearCalibration) to the commissioning bridge. The bridge also owns the commissioning bridge, which holds the
+ClearCalibration) to the commissioning bridge. Each of them answers *busy* while another command or a
+non-volatile write is outstanding. The start-up loads and stores are such writes. The bridge also owns the commissioning bridge, which holds the
 outstanding answer of each command. The bridge takes the platform it reads from as one argument: the inverter
 and encoder, the platform diagnostics, and the reset cause.
 

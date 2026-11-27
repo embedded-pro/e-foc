@@ -14,6 +14,16 @@ namespace integration
         constexpr std::size_t kParameterResponseBytes = 6;
         constexpr std::size_t kAlgorithmsResponseBytes = 4;
 
+        hal::Can::Message SetParameterFields(can::FocParameter parameter, float value)
+        {
+            const auto bits = std::bit_cast<uint32_t>(value);
+            hal::Can::Message payload;
+            payload.push_back(static_cast<uint8_t>(parameter));
+            for (int shift = 24; shift >= 0; shift -= 8)
+                payload.push_back(static_cast<uint8_t>(bits >> shift));
+            return payload;
+        }
+
         hal::Can::Id ResponseId(Fixture& fixture, uint8_t messageType)
         {
             return hal::Can::Id::Create29BitId(services::MakeCanId(services::CanPriority::response, can::focMotorCategoryId, messageType, fixture.ServerNodeId()));
@@ -35,12 +45,12 @@ namespace integration
 
     bool WriteParameter(Fixture& fixture, can::FocParameter parameter, float value)
     {
-        const auto bits = std::bit_cast<uint32_t>(value);
-        hal::Can::Message payload;
-        payload.push_back(static_cast<uint8_t>(parameter));
-        for (int shift = 24; shift >= 0; shift -= 8)
-            payload.push_back(static_cast<uint8_t>(bits >> shift));
-        return fixture.SendCanCommand(can::focMotorCategoryId, can::focSetParameterId, payload, kSettingTimeout);
+        return fixture.SendCommandWhenFree(can::focSetParameterId, SetParameterFields(parameter, value), kSettingTimeout);
+    }
+
+    bool WriteParameterOnce(Fixture& fixture, can::FocParameter parameter, float value)
+    {
+        return fixture.SendCanCommand(can::focMotorCategoryId, can::focSetParameterId, SetParameterFields(parameter, value), kSettingTimeout);
     }
 
     std::optional<can::FocParameterValue> ReadParameter(Fixture& fixture, can::FocParameter parameter)

@@ -11,7 +11,7 @@ GIVEN(R"(the {word} motor system is initialised with no valid calibration data)"
     auto& fixture = context.Get<Fixture>();
     ASSERT_TRUE(fixture.WaitForCanHeartbeat()) << "CAN stack not ready";
     (void)fixture.SendCanCommand(can::focMotorCategoryId, can::focStopId);
-    ASSERT_TRUE(fixture.SendCommissioningCommand(can::focClearCalibrationId, std::chrono::seconds{ 10 }))
+    ASSERT_TRUE(fixture.SendCommandWhenFree(can::focClearCalibrationId, {}, std::chrono::seconds{ 10 }))
         << "The target did not clear its stored calibration";
 }
 
@@ -29,7 +29,7 @@ WHEN(R"(the {word} control mode is selected)", (std::string mode))
 WHEN(R"(the calibrate command is issued)")
 {
     auto& fixture = context.Get<Fixture>();
-    ASSERT_TRUE(fixture.SendCommissioningCommand(can::focIdentifyElectricalId, std::chrono::seconds{ 60 }))
+    ASSERT_TRUE(fixture.SendCommandWhenFree(can::focIdentifyElectricalId, {}, std::chrono::seconds{ 60 }))
         << "Calibrate command did not complete within 60s";
 }
 

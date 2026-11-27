@@ -2,7 +2,7 @@
 title: "Integration Testing Design"
 type: design
 status: accepted
-version: 1.8.1
+version: 1.8.2
 component: integration-testing
 date: 2026-11-27
 ---
@@ -12,7 +12,7 @@ date: 2026-11-27
 | Title     | Integration Testing Design |
 | Type      | design                     |
 | Status    | accepted                   |
-| Version   | 1.8.1                      |
+| Version   | 1.8.2                      |
 | Component | integration-testing        |
 | Date      | 2026-11-27                 |
 
@@ -203,10 +203,12 @@ adapter delivers such requests in a burst when the target comes back. A burst of
 target's send queue ahead of the first command's acknowledgement.
 
 The target answers its first heartbeat before its start-up loads and stores end. On the emulated target they
-end about 25 ms of target time after the start. An electrical identification, a calibration or a calibration
-clear in that time is answered *busy*. The transport therefore sends such a command again while it is answered
-*busy*, every 20 ms, for up to 5 s. It never repeats any other refusal. A step that expects *busy* sends its
-command once.
+end about 25 ms of target time after the start. In that time the target answers *busy* to these commands:
+alignment, electrical identification, calibration, calibration clear, mode selection, algorithm selection and a
+parameter write. The transport therefore sends such a command again while it is answered *busy*, every 20 ms,
+for up to 5 s. It never repeats any other refusal. A step that expects *busy* sends its command once. The
+firmware-upgrade steps send Begin Upgrade and Activate again on *busy* only while the drive is stopped. An enabled
+drive answers them *busy* by design.
 
 ### Required from the system under test
 

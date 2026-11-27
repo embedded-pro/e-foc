@@ -7,6 +7,7 @@
 #include <deque>
 #include <gtest/gtest.h>
 #include <initializer_list>
+#include <iterator>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -55,8 +56,12 @@ namespace
 
         bool SendCanFrame(hal::Can::Id id, const hal::Can::Message& message, std::chrono::milliseconds) override
         {
-            if (id == MakeId(services::CanPriority::command, can::focMotorCategoryId, can::focIdentifyElectricalId))
-                Respond(message[0]);
+            const auto raw = id.Get29BitId();
+            if (services::ExtractCanCategory(raw) == can::focMotorCategoryId && services::ExtractCanPriority(raw) == services::CanPriority::command)
+            {
+                payloads.push_back(message);
+                Respond(services::ExtractCanMessageType(raw), message[0]);
+            }
             return true;
         }
 
@@ -93,9 +98,10 @@ namespace
 
         std::deque<Answer> answers;
         std::size_t commandsSent{ 0 };
+        std::vector<hal::Can::Message> payloads;
 
     private:
-        void Respond(uint8_t sequence)
+        void Respond(uint8_t messageType, uint8_t sequence)
         {
             ++commandsSent;
             const auto answer = answers.size() > 1 ? answers.front() : answers.back();
@@ -104,10 +110,10 @@ namespace
 
             if (answer.error.has_value())
                 Receive(MakeId(services::CanPriority::response, can::focMotorCategoryId, services::canCategoryErrorResponseMessageTypeId),
-                    { can::focIdentifyElectricalId, static_cast<uint8_t>(*answer.error) });
+                    { messageType, static_cast<uint8_t>(*answer.error) });
 
             Receive(MakeId(services::CanPriority::response, services::canSystemCategoryId, services::canCommandAckMessageTypeId),
-                { can::focMotorCategoryId, can::focIdentifyElectricalId, static_cast<uint8_t>(answer.status), sequence });
+                { can::focMotorCategoryId, messageType, static_cast<uint8_t>(answer.status), sequence });
         }
 
         void Receive(hal::Can::Id id, std::initializer_list<uint8_t> bytes)
@@ -123,11 +129,11 @@ namespace
         std::deque<std::pair<hal::Can::Id, hal::Can::Message>> pending;
     };
 
-    class CommissioningCommandTest
+    class CommandWhenFreeTest
         : public testing::Test
     {
     public:
-        CommissioningCommandTest()
+        CommandWhenFreeTest()
         {
             integration::TargetInteractor::SetInstance(target);
         }
@@ -135,14 +141,20 @@ namespace
         bool Identify()
         {
             integration::Fixture fixture;
-            return fixture.SendCommissioningCommand(can::focIdentifyElectricalId, std::chrono::seconds{ 1 }, std::chrono::milliseconds{ 200 });
+            return fixture.SendCommandWhenFree(can::focIdentifyElectricalId, {}, std::chrono::seconds{ 1 }, std::chrono::milliseconds{ 200 });
+        }
+
+        bool SetParameter(const hal::Can::Message& payload)
+        {
+            integration::Fixture fixture;
+            return fixture.SendCommandWhenFree(can::focSetParameterId, payload, std::chrono::seconds{ 1 }, std::chrono::milliseconds{ 200 });
         }
 
         ScriptedTarget target;
     };
 }
 
-TEST_F(CommissioningCommandTest, a_command_answered_busy_is_sent_again_until_it_is_accepted)
+TEST_F(CommandWhenFreeTest, a_command_answered_busy_is_sent_again_until_it_is_accepted)
 {
     target.answers = { kBusy, kBusy, kSuccess };
 
@@ -150,7 +162,7 @@ TEST_F(CommissioningCommandTest, a_command_answered_busy_is_sent_again_until_it_
     EXPECT_EQ(target.commandsSent, 3u);
 }
 
-TEST_F(CommissioningCommandTest, a_command_answered_busy_beyond_the_window_fails)
+TEST_F(CommandWhenFreeTest, a_command_answered_busy_beyond_the_window_fails)
 {
     target.answers = { kBusy };
 
@@ -158,7 +170,7 @@ TEST_F(CommissioningCommandTest, a_command_answered_busy_beyond_the_window_fails
     EXPECT_GT(target.commandsSent, 1u);
 }
 
-TEST_F(CommissioningCommandTest, a_command_refused_for_its_state_is_sent_once)
+TEST_F(CommandWhenFreeTest, a_command_refused_for_its_state_is_sent_once)
 {
     target.answers = { kInvalidState, kSuccess };
 
@@ -166,10 +178,24 @@ TEST_F(CommissioningCommandTest, a_command_refused_for_its_state_is_sent_once)
     EXPECT_EQ(target.commandsSent, 1u);
 }
 
-TEST_F(CommissioningCommandTest, a_command_that_fails_with_another_category_error_is_sent_once)
+TEST_F(CommandWhenFreeTest, a_command_that_fails_with_another_category_error_is_sent_once)
 {
     target.answers = { kCalibrationFailed, kSuccess };
 
     EXPECT_FALSE(Identify());
     EXPECT_EQ(target.commandsSent, 1u);
+}
+
+TEST_F(CommandWhenFreeTest, a_command_answered_busy_is_sent_again_with_the_same_fields)
+{
+    target.answers = { kBusy, kSuccess };
+    const std::vector<uint8_t> fields{ static_cast<uint8_t>(can::FocParameter::telemetryRate), 0x43, 0x48, 0x00, 0x00 };
+    hal::Can::Message payload;
+    for (const auto byte : fields)
+        payload.push_back(byte);
+
+    EXPECT_TRUE(SetParameter(payload));
+    ASSERT_EQ(target.payloads.size(), 2u);
+    for (const auto& sent : target.payloads)
+        EXPECT_EQ(std::vector<uint8_t>(std::next(sent.begin()), sent.end()), fields);
 }

@@ -151,13 +151,13 @@ namespace integration
         }
     }
 
-    bool Fixture::SendCommissioningCommand(uint8_t messageType, std::chrono::milliseconds timeout, std::chrono::milliseconds busyWindow)
+    bool Fixture::SendCommandWhenFree(uint8_t messageType, const hal::Can::Message& payload, std::chrono::milliseconds timeout, std::chrono::milliseconds busyWindow)
     {
         const auto busyDeadline = std::chrono::steady_clock::now() + busyWindow;
         while (true)
         {
             const auto mark = MarkCapture();
-            if (SendCanCommand(can::focMotorCategoryId, messageType, {}, timeout))
+            if (SendCanCommand(can::focMotorCategoryId, messageType, payload, timeout))
                 return true;
 
             if (!AnsweredBusy(messageType, mark) || std::chrono::steady_clock::now() >= busyDeadline)
@@ -318,7 +318,7 @@ namespace integration
     {
         hal::Can::Message payload;
         payload.push_back(static_cast<uint8_t>(mode));
-        if (!SendCanCommand(can::focMotorCategoryId, can::focSelectControlModeId, payload, timeout))
+        if (!SendCommandWhenFree(can::focSelectControlModeId, payload, timeout))
             return false;
         return WaitForMotorState({ can::FocMotorState::idle, can::FocMotorState::ready }, timeout);
     }
