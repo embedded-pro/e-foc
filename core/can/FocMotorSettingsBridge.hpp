@@ -23,7 +23,7 @@ namespace can
         void SelectAlgorithm(FocControlLoop loop, uint8_t algorithm, const infra::Function<void(const FocAlgorithms&)>& onDone);
         void SetParameter(FocParameter parameter, float value, const infra::Function<void(FocParameterValue)>& onDone);
         FocAlgorithms ActiveAlgorithms() const;
-        FocParameterValue HeldValue(FocParameter parameter) const;
+        void QueryParameter(FocParameter parameter, const infra::Function<void(FocParameterValue)>& onDone);
         void ClearDiagnostics();
         void Recalibrate(const infra::Function<void()>& onAccepted);
         void ResetModel(const infra::Function<void(bool stored)>& onDone);
@@ -36,6 +36,8 @@ namespace can
         void CompleteAlgorithmSelection(state_machine::SettingResult result);
         void CompleteParameter(state_machine::SettingResult result);
         void ReportSettingFailure(uint8_t commandId, state_machine::SettingResult result);
+        void CompleteStagedVersionQuery(services::FirmwareVersion staged);
+        FocParameterValue HeldValue(FocParameter parameter) const;
         FocParameterValue HeldLoopSetting(FocParameter parameter) const;
         FocParameterValue HeldMotorParameter(FocParameter parameter) const;
         FocParameterValue HeldCalibrationReading(FocParameter parameter) const;
@@ -57,6 +59,8 @@ namespace can
         infra::Function<void(const FocAlgorithms&)> pendingAlgorithmCallback;
         infra::Function<void(FocParameterValue)> pendingParameterCallback;
         FocParameter pendingParameter{ FocParameter::currentBandwidth };
+        infra::Function<void(FocParameterValue)> pendingStagedVersionCallback;
+        FocParameter pendingStagedVersionParameter{ FocParameter::stagedVersionMajor };
         float previousStoredSetting{ 0.0f };
     };
 }

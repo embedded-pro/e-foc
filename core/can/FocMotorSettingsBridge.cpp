@@ -37,6 +37,20 @@ namespace can
             return id >= static_cast<uint8_t>(FocParameter::modelResistance) && id <= static_cast<uint8_t>(FocParameter::recalibrationsStored);
         }
 
+        bool IsStagedVersion(FocParameter parameter)
+        {
+            return parameter == FocParameter::stagedVersionMajor || parameter == FocParameter::stagedVersionMinor || parameter == FocParameter::stagedVersionPatch;
+        }
+
+        FocParameterValue StagedVersionNumber(services::FirmwareVersion staged, FocParameter parameter)
+        {
+            if (parameter == FocParameter::stagedVersionMajor)
+                return FocParameterValue{ static_cast<float>(staged.major), false };
+            if (parameter == FocParameter::stagedVersionMinor)
+                return FocParameterValue{ static_cast<float>(staged.minor), false };
+            return FocParameterValue{ static_cast<float>(staged.patch), false };
+        }
+
         bool IsStoredSetting(FocParameter parameter)
         {
             const auto group = GroupOf(parameter);
@@ -128,6 +142,28 @@ namespace can
             ToCanAlgorithm(controlMode.Algorithms().ActiveSpeedAlgorithm()),
             ToCanAlgorithm(controlMode.Algorithms().ActivePositionAlgorithm())
         };
+    }
+
+    void FocMotorSettingsBridge::QueryParameter(FocParameter parameter, const infra::Function<void(FocParameterValue)>& onDone)
+    {
+        if (!firmwareUpgrade || !IsStagedVersion(parameter))
+        {
+            onDone(HeldValue(parameter));
+            return;
+        }
+
+        if (pendingStagedVersionCallback != nullptr)
+        {
+            server.SendCategoryError(can::focQueryParameterId, FocMotorCategoryError::busy);
+            return;
+        }
+
+        pendingStagedVersionParameter = parameter;
+        pendingStagedVersionCallback = onDone;
+        firmwareUpgrade->get().ReadStagedVersion([this](services::FirmwareVersion staged)
+            {
+                CompleteStagedVersionQuery(staged);
+            });
     }
 
     FocParameterValue FocMotorSettingsBridge::HeldValue(FocParameter parameter) const
@@ -267,8 +303,6 @@ namespace can
 
     FocParameterValue FocMotorSettingsBridge::HeldPlatformReading(FocParameter parameter) const
     {
-        const auto staged = firmwareUpgrade ? firmwareUpgrade->get().StagedVersion() : services::FirmwareVersion{};
-
         switch (parameter)
         {
             case FocParameter::firmwareVersionMajor:
@@ -280,11 +314,9 @@ namespace can
             case FocParameter::boardKind:
                 return FocParameterValue{ static_cast<float>(firmware.boardKind), false };
             case FocParameter::stagedVersionMajor:
-                return FocParameterValue{ static_cast<float>(staged.major), false };
             case FocParameter::stagedVersionMinor:
-                return FocParameterValue{ static_cast<float>(staged.minor), false };
             case FocParameter::stagedVersionPatch:
-                return FocParameterValue{ static_cast<float>(staged.patch), false };
+                return StagedVersionNumber(services::FirmwareVersion{}, parameter);
             default:
                 return FocParameterValue{ static_cast<float>(resetCause), false };
         }
@@ -340,6 +372,13 @@ namespace can
             onDone(HeldValue(pendingParameter));
         else
             ReportSettingFailure(can::focSetParameterId, result);
+    }
+
+    void FocMotorSettingsBridge::CompleteStagedVersionQuery(services::FirmwareVersion staged)
+    {
+        auto onDone = pendingStagedVersionCallback;
+        pendingStagedVersionCallback = nullptr;
+        onDone(StagedVersionNumber(staged, pendingStagedVersionParameter));
     }
 
     void FocMotorSettingsBridge::ReportSettingFailure(uint8_t commandId, state_machine::SettingResult result)

@@ -2,7 +2,7 @@
 title: "Service: Firmware Upgrade"
 type: design
 status: draft
-version: 0.3.14
+version: 0.3.15
 component: "service-firmware-upgrade"
 date: 2026-11-27
 ---
@@ -12,7 +12,7 @@ date: 2026-11-27
 | Title     | Service: Firmware Upgrade |
 | Type      | design                    |
 | Status    | draft                     |
-| Version   | 0.3.14                    |
+| Version   | 0.3.15                    |
 | Component | service-firmware-upgrade  |
 | Date      | 2026-11-27                |
 
@@ -258,6 +258,9 @@ The firmware answers the running version and the board kind (0xB1–0xB4) from t
 from the version information EmIL generates from the project version. The board kind comes from the platform,
 which reports the kind of the board the build is for, from the board definitions ([bootloader.md](bootloader.md) Part B).
 The firmware answers the staged-version parameters (0xB5–0xB7) from the version the service holds staged.
+At start-up the service reads the staged pack's header back in the background. A staged-version query that
+arrives before this read ends is answered when it ends, never with zero for a staged pack. A second
+staged-version query while one waits is answered *busy*. An abort while a query waits answers it with 0.0.0.
 Board kinds are numbers: 1 is the reference board, 2 and 3 further boards, emulated 5, unknown 0. Kind 4 was
 a board whose support was dropped, and is never reused.
 
@@ -340,7 +343,7 @@ into the shard that keeps the three software-in-the-loop shards balanced.
 |----------------------------------|------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Firmware-upgrade category server | Download and apply a pack over CAN | can-lite firmware-upgrade specification; answers as Parts B to F                                                                                                        |
 | Running state                    | Interlock with the drive           | True while a pack is received, from an accepted Begin, through the erase, until Verify, Abort or the inactivity deadline, and from an accepted Activate until the reset |
-| Staged version                   | The version waiting to be applied  | The staged pack's product version, zero when none is staged (Part H)                                                                                                    |
+| Staged version                   | The version waiting to be applied  | The staged pack's product version, zero when none is staged; answered once the start-up read of the staged header ends (Part H)                                         |
 | Emergency stop                   | End a download in progress         | As Abort, without its answer (Part F)                                                                                                                                   |
 
 ### Required
